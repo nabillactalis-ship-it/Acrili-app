@@ -1,0 +1,5 @@
+__pycache__/
+*.py[cod]
+*$py.class
+nachrilak_data/
+app.log
