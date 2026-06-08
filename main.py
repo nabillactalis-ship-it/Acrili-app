@@ -565,11 +565,13 @@ class DriverOrdersScreen(Screen, BaseScreen):
         self.switch('home_screen')
 
 class SettingsScreen(Screen, BaseScreen):
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
+    def on_pre_enter(self):
+        self.clear_widgets()
         self.add_back_button('home_screen')
+
+        balance = current_user['balance'] if current_user else 0
         self.balance_label = Label(
-            text=ar('الرصيد: 0 نقطة'),
+            text=ar(f'الرصيد: {balance} نقطة'),
             font_name='Cairo',
             font_size=26, bold=True,
             size_hint=(0.85, 0.15),
@@ -607,10 +609,6 @@ class SettingsScreen(Screen, BaseScreen):
             self.switch('login_screen')
         logout_btn.bind(on_press=logout)
         self.add_widget(logout_btn)
-
-    def on_pre_enter(self):
-        balance = current_user['balance'] if current_user else 0
-        self.balance_label.text = ar(f'الرصيد: {balance} نقطة')
 
 class TopUpScreen(Screen, BaseScreen):
     def __init__(self, **kwargs):
