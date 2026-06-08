@@ -2,5 +2,4 @@ __pycache__/
 *.py[cod]
 *$py.class
 nachrilak_data/
-Cairo-Regular.ttf
 app.log
