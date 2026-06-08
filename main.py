@@ -26,6 +26,8 @@ LabelBase.register(name='Cairo', fn_regular=font_path)
 
 def ar(text):
     """دالة تعالج العربية باش تتلصق وتترتب من اليمين"""
+    if not text:
+        return ""
     reshaped = arabic_reshaper.reshape(text)
     return get_display(reshaped)
 
@@ -41,7 +43,7 @@ def load_products():
     if os.path.exists(PRODUCTS_FILE):
         with open(PRODUCTS_FILE, 'r', encoding='utf-8') as f:
             return json.load(f)
-    return [{'name': ar('بيتزا'), 'price': 800, 'supplier': 'admin@nachrilak.com', 'payment_methods': ['points'], 'ccp_number': ''}]
+    return [{'name': 'بيتزا', 'price': 800, 'supplier': 'admin@nachrilak.com', 'payment_methods': ['points'], 'ccp_number': ''}]
 
 def save_products(products_list):
     with open(PRODUCTS_FILE, 'w', encoding='utf-8') as f:
@@ -75,7 +77,7 @@ products = load_products()
 orders = load_orders()
 selected_product = None
 
-class BaseScreen(FloatLayout):
+class BaseScreen(Screen):
     def add_back_button(self, target='home_screen'):
         back_btn = Button(
             text=ar('< رجوع'),
@@ -97,13 +99,14 @@ class BaseScreen(FloatLayout):
         self.manager.transition = SlideTransition(direction='left')
         self.manager.current = screen
 
-class LoginScreen(Screen, BaseScreen):
+class LoginScreen(BaseScreen):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
+        self.layout = FloatLayout()
         scroll = ScrollView(do_scroll_x=False)
-        layout = FloatLayout(size_hint_y=None, height=800)
+        scroll_content = FloatLayout(size_hint_y=None, height=800)
 
-        layout.add_widget(Label(
+        scroll_content.add_widget(Label(
             text=ar('نشريلك'),
             font_name='Cairo',
             font_size=40,
@@ -112,7 +115,7 @@ class LoginScreen(Screen, BaseScreen):
             pos_hint={'center_x': 0.5, 'top': 0.95}
         ))
 
-        type_spinner = Spinner(
+        self.type_spinner = Spinner(
             text=ar('زبون'),
             values=[ar('زبون'), ar('تاجر'), ar('سائق')],
             font_name='Cairo',
@@ -122,9 +125,9 @@ class LoginScreen(Screen, BaseScreen):
             size_hint=(0.9, 0.13),
             pos_hint={'center_x': 0.5, 'top': 0.8}
         )
-        layout.add_widget(type_spinner)
+        scroll_content.add_widget(self.type_spinner)
 
-        email_input = TextInput(
+        self.email_input = TextInput(
             hint_text=ar('البريد الإلكتروني'),
             font_name='Cairo',
             multiline=False,
@@ -134,9 +137,9 @@ class LoginScreen(Screen, BaseScreen):
             size_hint=(0.9, 0.15),
             pos_hint={'center_x': 0.5, 'top': 0.63}
         )
-        layout.add_widget(email_input)
+        scroll_content.add_widget(self.email_input)
 
-        password_input = TextInput(
+        self.password_input = TextInput(
             hint_text=ar('كلمة المرور'),
             font_name='Cairo',
             password=True,
@@ -147,12 +150,14 @@ class LoginScreen(Screen, BaseScreen):
             size_hint=(0.9, 0.15),
             pos_hint={'center_x': 0.5, 'top': 0.44}
         )
-        layout.add_widget(password_input)
+        scroll_content.add_widget(self.password_input)
 
         def update_fields(instance, value):
             global user_type
-            user_type = value
-        type_spinner.bind(text=update_fields)
+            if value == ar('زبون'): user_type = 'زبون'
+            elif value == ar('تاجر'): user_type = 'تاجر'
+            elif value == ar('سائق'): user_type = 'سائق'
+        self.type_spinner.bind(text=update_fields)
 
         login_btn = Button(
             text=ar('دخول'),
@@ -164,34 +169,36 @@ class LoginScreen(Screen, BaseScreen):
             background_normal='',
             background_color=(0.0, 0.4, 0.8, 1)
         )
+        login_btn.bind(on_press=self.login)
+        scroll_content.add_widget(login_btn)
 
-        def login(instance):
-            global current_user, current_email
-            email = email_input.text.strip()
-            password = password_input.text.strip()
-            if not email or not password:
-                email_input.hint_text = ar('املأ الكل')
-                return
-            if email not in users:
-                balance = 100 if user_type == ar('زبون') else 0
-                users[email] = {'password': password, 'balance': balance, 'type': user_type}
-                save_users(users)
-            elif users[email]['password']!= password:
-                password_input.text = ''
-                password_input.hint_text = ar('خطأ')
-                return
-            current_user = users[email]
-            current_email = email
-            self.manager.current = 'home_screen'
-        login_btn.bind(on_press=login)
-        layout.add_widget(login_btn)
+        scroll.add_widget(scroll_content)
+        self.layout.add_widget(scroll)
+        self.add_widget(self.layout)
 
-        scroll.add_widget(layout)
-        self.add_widget(scroll)
+    def login(self, instance):
+        global current_user, current_email
+        email = self.email_input.text.strip()
+        password = self.password_input.text.strip()
+        if not email or not password:
+            self.email_input.hint_text = ar('املأ الكل')
+            return
+        if email not in users:
+            balance = 100 if user_type == 'زبون' else 0
+            users[email] = {'password': password, 'balance': balance, 'type': user_type}
+            save_users(users)
+        elif users[email]['password']!= password:
+            self.password_input.text = ''
+            self.password_input.hint_text = ar('خطأ')
+            return
+        current_user = users[email]
+        current_email = email
+        self.manager.current = 'home_screen'
 
-class HomeScreen(Screen, BaseScreen):
+class HomeScreen(BaseScreen):
     def on_pre_enter(self):
         self.clear_widgets()
+        layout = FloatLayout()
         self.add_back_button('login_screen')
 
         btn1 = Button(
@@ -203,9 +210,9 @@ class HomeScreen(Screen, BaseScreen):
             background_normal='', background_color=(0.25, 0.25, 0.25, 1)
         )
         btn1.bind(on_press=lambda x: self.switch('products_screen'))
-        self.add_widget(btn1)
+        layout.add_widget(btn1)
 
-        if current_user and current_user['type'] == ar('تاجر'):
+        if current_user and current_user['type'] == 'تاجر':
             btn_orders = Button(
                 text=ar('الطلبات'),
                 font_name='Cairo',
@@ -215,7 +222,7 @@ class HomeScreen(Screen, BaseScreen):
                 background_normal='', background_color=(0.8, 0.4, 0.0, 1)
             )
             btn_orders.bind(on_press=lambda x: self.switch('supplier_orders_screen'))
-            self.add_widget(btn_orders)
+            layout.add_widget(btn_orders)
 
             btn_add = Button(
                 text=ar('أضف منتج'),
@@ -226,9 +233,9 @@ class HomeScreen(Screen, BaseScreen):
                 background_normal='', background_color=(0.0, 0.6, 0.3, 1)
             )
             btn_add.bind(on_press=lambda x: self.switch('add_product_screen'))
-            self.add_widget(btn_add)
+            layout.add_widget(btn_add)
             settings_y = 0.25
-        elif current_user and current_user['type'] == ar('سائق'):
+        elif current_user and current_user['type'] == 'سائق':
             btn_orders = Button(
                 text=ar('الطلبات'),
                 font_name='Cairo',
@@ -238,7 +245,7 @@ class HomeScreen(Screen, BaseScreen):
                 background_normal='', background_color=(0.0, 0.5, 0.8, 1)
             )
             btn_orders.bind(on_press=lambda x: self.switch('driver_orders_screen'))
-            self.add_widget(btn_orders)
+            layout.add_widget(btn_orders)
             settings_y = 0.45
         else:
             settings_y = 0.65
@@ -252,14 +259,16 @@ class HomeScreen(Screen, BaseScreen):
             background_normal='', background_color=(0.25, 0.25, 0.25, 1)
         )
         btn2.bind(on_press=lambda x: self.switch('settings_screen'))
-        self.add_widget(btn2)
+        layout.add_widget(btn2)
+        self.add_widget(layout)
 
-class ProductsScreen(Screen, BaseScreen):
+class ProductsScreen(BaseScreen):
     def on_pre_enter(self):
         self.clear_widgets()
+        layout = FloatLayout()
         self.add_back_button('home_screen')
 
-        if current_user and current_user['type'] == ar('زبون'):
+        if current_user and current_user['type'] == 'زبون':
             add_order_btn = Button(
                 text=ar('أضف طلب'),
                 font_name='Cairo',
@@ -269,7 +278,7 @@ class ProductsScreen(Screen, BaseScreen):
                 background_normal='', background_color=(0.8, 0.2, 0.2, 1)
             )
             add_order_btn.bind(on_press=lambda x: self.switch('search_product_screen'))
-            self.add_widget(add_order_btn)
+            layout.add_widget(add_order_btn)
             scroll_y = 0.4
         else:
             scroll_y = 0.5
@@ -280,20 +289,22 @@ class ProductsScreen(Screen, BaseScreen):
 
         for p in products:
             grid.add_widget(Label(
-                text=f"{p['name']} - {p['price']} {ar('نقطة')}",
+                text=ar(f"{p['name']} - {p['price']} نقطة"),
                 font_name='Cairo',
                 font_size=22, size_hint_y=None, height=70
             ))
         scroll.add_widget(grid)
-        self.add_widget(scroll)
+        layout.add_widget(scroll)
+        self.add_widget(layout)
 
-class AddProductScreen(Screen, BaseScreen):
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
+class AddProductScreen(BaseScreen):
+    def on_pre_enter(self):
+        self.clear_widgets()
+        layout_float = FloatLayout()
         self.add_back_button('home_screen')
 
-        scroll = ScrollView(do_scroll_x=False)
-        layout = BoxLayout(orientation='vertical', padding=40, spacing=20, size_hint_y=None, height=800)
+        scroll = ScrollView(do_scroll_x=False, size_hint=(1, 0.85), pos_hint={'top': 0.85})
+        layout = BoxLayout(orientation='vertical', padding=40, spacing=20, size_hint_y=None)
         layout.bind(minimum_height=layout.setter('height'))
 
         layout.add_widget(Label(text=ar('إضافة منتج'), font_name='Cairo', font_size=30, bold=True, size_hint_y=None, height=70))
@@ -320,54 +331,54 @@ class AddProductScreen(Screen, BaseScreen):
         self.ccp_input = TextInput(hint_text=ar('رقم CCP'), font_name='Cairo', font_size=22, padding=[20, 25], background_color=(1, 1, 1, 1), size_hint_y=None, height=85)
         layout.add_widget(self.ccp_input)
 
-        add_btn = Button(text=ar('إضافة'), font_name='Cairo', font_size=24, bold=True, size_hint=(0.85, 0.15), pos_hint={'center_x': 0.5}, background_normal='', background_color=(0.0, 0.6, 0.4, 1))
-
-        def add_product(x):
-            name = self.name_input.text.strip()
-            try:
-                price = int(self.price_input.text)
-                methods = []
-                if ar('[x]') in self.pay_points.text: methods.append('points')
-                if ar('[x]') in self.pay_ccp.text: methods.append('ccp')
-                if ar('[x]') in self.pay_cash.text: methods.append('cash')
-
-                if name and price > 0 and methods and current_email:
-                    products.append({
-                        'name': name,
-                        'price': price,
-                        'supplier': current_email,
-                        'payment_methods': methods,
-                        'ccp_number': self.ccp_input.text.strip() if 'ccp' in methods else ''
-                    })
-                    save_products(products)
-                    self.switch('home_screen')
-            except:
-                self.price_input.hint_text = ar('خطأ')
-        add_btn.bind(on_press=add_product)
+        add_btn = Button(text=ar('إضافة'), font_name='Cairo', font_size=24, bold=True, size_hint_y=None, height=85, background_normal='', background_color=(0.0, 0.6, 0.4, 1))
+        add_btn.bind(on_press=self.add_product)
         layout.add_widget(add_btn)
+
         layout.add_widget(Label(size_hint_y=None, height=100))
         scroll.add_widget(layout)
-        self.add_widget(scroll)
+        layout_float.add_widget(scroll)
+        self.add_widget(layout_float)
 
     def toggle_btn(self, btn):
-        if ar('[ ]') in btn.text:
-            btn.text = btn.text.replace(ar('[ ]'), ar('[x]'))
-            btn.background_color = (0.0, 0.6, 0.4, 1)
+        if '[ ]' in get_display(arabic_reshaper.reshape(btn.text)): # Check logically if possible, but let's be simpler
+            pass
+        # Better toggle check
+        if 'x' in btn.text:
+             btn.text = btn.text.replace('x', ' ')
+             btn.background_color = (0.3, 0.3, 0.3, 1)
         else:
-            btn.text = btn.text.replace(ar('[x]'), ar('[ ]'))
-            btn.background_color = (0.3, 0.3, 0.3, 1)
+             btn.text = btn.text.replace(' ', 'x')
+             btn.background_color = (0.0, 0.6, 0.4, 1)
 
-class SearchProductScreen(Screen, BaseScreen):
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        self.add_back_button('products_screen')
+    def add_product(self, x):
+        name = self.name_input.text.strip()
+        try:
+            price = int(self.price_input.text)
+            methods = []
+            if 'x' in self.pay_points.text: methods.append('points')
+            if 'x' in self.pay_ccp.text: methods.append('ccp')
+            if 'x' in self.pay_cash.text: methods.append('cash')
 
+            if name and price > 0 and methods and current_email:
+                products.append({
+                    'name': name,
+                    'price': price,
+                    'supplier': current_email,
+                    'payment_methods': methods,
+                    'ccp_number': self.ccp_input.text.strip() if 'ccp' in methods else ''
+                })
+                save_products(products)
+                self.switch('home_screen')
+        except:
+            self.price_input.hint_text = ar('خطأ')
+
+class SearchProductScreen(BaseScreen):
     def on_pre_enter(self):
         self.clear_widgets()
         self.add_back_button('products_screen')
 
         layout = BoxLayout(orientation='vertical', padding=30, spacing=15)
-
         layout.add_widget(Label(text=ar('اختر المنتج'), font_name='Cairo', font_size=28, bold=True, size_hint_y=None, height=60))
 
         scroll = ScrollView()
@@ -376,7 +387,7 @@ class SearchProductScreen(Screen, BaseScreen):
 
         for idx, p in enumerate(products):
             btn = Button(
-                text=f"{p['name']} - {p['price']} {ar('نقطة')}",
+                text=ar(f"{p['name']} - {p['price']} نقطة"),
                 font_name='Cairo',
                 font_size=20,
                 size_hint_y=None,
@@ -396,13 +407,13 @@ class SearchProductScreen(Screen, BaseScreen):
         selected_product = products[idx]
         self.switch('confirm_order_screen')
 
-class ConfirmOrderScreen(Screen, BaseScreen):
+class ConfirmOrderScreen(BaseScreen):
     def on_pre_enter(self):
         self.clear_widgets()
         self.add_back_button('search_product_screen')
 
         scroll = ScrollView(do_scroll_x=False)
-        layout = BoxLayout(orientation='vertical', padding=40, spacing=20, size_hint_y=None, height=700)
+        layout = BoxLayout(orientation='vertical', padding=40, spacing=20, size_hint_y=None)
         layout.bind(minimum_height=layout.setter('height'))
 
         if selected_product:
@@ -412,23 +423,25 @@ class ConfirmOrderScreen(Screen, BaseScreen):
 
             layout.add_widget(Label(text=ar('طريقة الدفع'), font_name='Cairo', font_size=22, bold=True, size_hint_y=None, height=50))
 
+            vals = []
+            display_to_logical = {}
+            for v in selected_product['payment_methods']:
+                if v == 'points': d = ar('نقاط')
+                elif v == 'ccp': d = 'CCP'
+                elif v == 'cash': d = ar('كاش')
+                else: d = v
+                vals.append(d)
+                display_to_logical[d] = v
+
             self.pay_choice = Spinner(
-                text=selected_product['payment_methods'][0] if selected_product['payment_methods'] else 'points',
-                values=selected_product['payment_methods'],
+                text=vals[0] if vals else "",
+                values=vals,
                 font_name='Cairo',
                 font_size=22,
                 size_hint_y=None,
                 height=80,
                 background_color=(0.15, 0.15, 0.15, 1)
             )
-            # ترجمة قيم الدفع
-            vals = []
-            for v in selected_product['payment_methods']:
-                if v == 'points': vals.append(ar('نقاط'))
-                elif v == 'ccp': vals.append('CCP')
-                elif v == 'cash': vals.append(ar('كاش'))
-            self.pay_choice.values = vals
-            if vals: self.pay_choice.text = vals[0]
             layout.add_widget(self.pay_choice)
 
             if 'ccp' in selected_product['payment_methods']:
@@ -445,8 +458,8 @@ class ConfirmOrderScreen(Screen, BaseScreen):
                     'price': selected_product['price'],
                     'supplier': selected_product['supplier'],
                     'driver': None,
-                    'payment_method': self.pay_choice.text,
-                    'status': ar('قيد الانتظار'),
+                    'payment_method': display_to_logical.get(self.pay_choice.text, self.pay_choice.text),
+                    'status': 'قيد الانتظار',
                     'time': datetime.now().strftime('%Y-%m-%d %H:%M')
                 }
                 orders.append(order)
@@ -459,7 +472,7 @@ class ConfirmOrderScreen(Screen, BaseScreen):
         scroll.add_widget(layout)
         self.add_widget(scroll)
 
-class SupplierOrdersScreen(Screen, BaseScreen):
+class SupplierOrdersScreen(BaseScreen):
     def on_pre_enter(self):
         self.clear_widgets()
         self.add_back_button('home_screen')
@@ -471,7 +484,7 @@ class SupplierOrdersScreen(Screen, BaseScreen):
         grid = GridLayout(cols=1, size_hint_y=None, spacing=10, padding=10)
         grid.bind(minimum_height=grid.setter('height'))
 
-        my_orders = [o for o in orders if o['supplier'] == current_email and o['status'] == ar('قيد الانتظار')]
+        my_orders = [o for o in orders if o['supplier'] == current_email and o['status'] == 'قيد الانتظار']
         if not my_orders:
             grid.add_widget(Label(text=ar('لا توجد طلبات'), font_name='Cairo', font_size=20))
         else:
@@ -501,28 +514,28 @@ class SupplierOrdersScreen(Screen, BaseScreen):
     def validate_order(self, order_id):
         global orders, users
         for o in orders:
-            if o['id'] == order_id and o['status'] == ar('قيد الانتظار'):
+            if o['id'] == order_id and o['status'] == 'قيد الانتظار':
                 customer_email = o['customer']
                 price = o['price']
                 payment = o['payment_method']
 
-                if ar('نقاط') in payment:
+                if payment == 'points':
                     if users[customer_email]['balance'] >= price:
                         users[customer_email]['balance'] -= price
                         users[current_email]['balance'] += price
-                        o['status'] = ar('جاهز للتوصيل')
+                        o['status'] = 'جاهز للتوصيل'
                         save_users(users)
                         save_orders(orders)
                     else:
-                        o['status'] = ar('ملغي')
+                        o['status'] = 'ملغي'
                         save_orders(orders)
                 else:
-                    o['status'] = ar('جاهز للتوصيل')
+                    o['status'] = 'جاهز للتوصيل'
                     save_orders(orders)
                 break
         self.on_pre_enter()
 
-class DriverOrdersScreen(Screen, BaseScreen):
+class DriverOrdersScreen(BaseScreen):
     def on_pre_enter(self):
         self.clear_widgets()
         self.add_back_button('home_screen')
@@ -531,10 +544,10 @@ class DriverOrdersScreen(Screen, BaseScreen):
         layout.add_widget(Label(text=ar('الطلبات الجاهزة'), font_name='Cairo', font_size=28, bold=True, size_hint_y=None, height=60))
 
         scroll = ScrollView()
-        grid = GridLayout(cols=1, size_hint_y=None, height=1000)
+        grid = GridLayout(cols=1, size_hint_y=None)
         grid.bind(minimum_height=grid.setter('height'))
 
-        available = [o for o in orders if o['status'] == ar('جاهز للتوصيل') and o['driver'] is None]
+        available = [o for o in orders if o['status'] == 'جاهز للتوصيل' and o['driver'] is None]
         if not available:
             grid.add_widget(Label(text=ar('لا توجد طلبات'), font_name='Cairo', font_size=20))
         else:
@@ -559,14 +572,15 @@ class DriverOrdersScreen(Screen, BaseScreen):
         for o in orders:
             if o['id'] == order_id:
                 o['driver'] = current_email
-                o['status'] = ar('قيد التوصيل')
+                o['status'] = 'قيد التوصيل'
                 save_orders(orders)
                 break
         self.switch('home_screen')
 
-class SettingsScreen(Screen, BaseScreen):
+class SettingsScreen(BaseScreen):
     def on_pre_enter(self):
         self.clear_widgets()
+        layout = FloatLayout()
         self.add_back_button('home_screen')
 
         balance = current_user['balance'] if current_user else 0
@@ -577,9 +591,9 @@ class SettingsScreen(Screen, BaseScreen):
             size_hint=(0.85, 0.15),
             pos_hint={'center_x': 0.5, 'center_y': 0.7}
         )
-        self.add_widget(self.balance_label)
+        layout.add_widget(self.balance_label)
 
-        if current_user and current_user['type'] == ar('زبون'):
+        if current_user and current_user['type'] == 'زبون':
             topup_btn = Button(
                 text=ar('شحن الرصيد'),
                 font_name='Cairo',
@@ -589,7 +603,7 @@ class SettingsScreen(Screen, BaseScreen):
                 background_normal='', background_color=(0.0, 0.6, 0.4, 1)
             )
             topup_btn.bind(on_press=lambda x: self.switch('topup_screen'))
-            self.add_widget(topup_btn)
+            layout.add_widget(topup_btn)
             logout_y = 0.3
         else:
             logout_y = 0.5
@@ -608,14 +622,16 @@ class SettingsScreen(Screen, BaseScreen):
             current_email = None
             self.switch('login_screen')
         logout_btn.bind(on_press=logout)
-        self.add_widget(logout_btn)
+        layout.add_widget(logout_btn)
+        self.add_widget(layout)
 
-class TopUpScreen(Screen, BaseScreen):
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
+class TopUpScreen(BaseScreen):
+    def on_pre_enter(self):
+        self.clear_widgets()
+        layout_float = FloatLayout()
         self.add_back_button('settings_screen')
-        scroll = ScrollView(do_scroll_x=False)
-        layout = BoxLayout(orientation='vertical', size_hint_y=None, height=600, padding=35, spacing=25)
+        scroll = ScrollView(do_scroll_x=False, size_hint=(1, 0.85), pos_hint={'top': 0.85})
+        layout = BoxLayout(orientation='vertical', size_hint_y=None, padding=35, spacing=25)
         layout.bind(minimum_height=layout.setter('height'))
 
         layout.add_widget(Label(text=ar('شحن الرصيد'), font_name='Cairo', size_hint_y=None, height=80, font_size=30, bold=True))
@@ -639,22 +655,24 @@ class TopUpScreen(Screen, BaseScreen):
             size_hint_y=None, height=90,
             background_normal='', background_color=(0.0, 0.6, 0.4, 1)
         )
-        def request(x):
-            try:
-                amount = int(self.amount.text)
-                if current_user and amount >= 10:
-                    current_user['balance'] += amount // 10
-                    users[current_email] = current_user
-                    save_users(users)
-                    self.amount.text = ''
-                    self.switch('settings_screen')
-            except:
-                self.amount.hint_text = ar('قيمة خاطئة')
-        btn.bind(on_press=request)
+        btn.bind(on_press=self.request_topup)
         layout.add_widget(btn)
 
         scroll.add_widget(layout)
-        self.add_widget(scroll)
+        layout_float.add_widget(scroll)
+        self.add_widget(layout_float)
+
+    def request_topup(self, x):
+        try:
+            amount = int(self.amount.text)
+            if current_user and amount >= 10:
+                current_user['balance'] += amount // 10
+                users[current_email] = current_user
+                save_users(users)
+                self.amount.text = ''
+                self.switch('settings_screen')
+        except:
+            self.amount.hint_text = ar('قيمة خاطئة')
 
 class MainApp(App):
     def build(self):
