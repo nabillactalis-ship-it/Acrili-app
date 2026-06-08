@@ -1,1 +1,25 @@
-# Acrili-app
+name: Build APK
+on: 
+  push:
+    branches: [ main ]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.10'
+    - name: Install dependencies
+      run: |
+        sudo apt update
+        sudo apt install -y git zip unzip openjdk-17-jdk python3-pip
+        pip install buildozer cython
+    - name: Build with Buildozer
+      run: buildozer -v android debug
+    - name: Upload APK
+      uses: actions/upload-artifact@v4
+      with:
+        name: Acrili-APK
+        path: bin/*.apk
