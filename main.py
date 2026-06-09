@@ -1,26 +1,23 @@
 from kivy.app import App
-from kivy.uix.screenmanager import ScreenManager, Screen, SlideTransition
-from kivy.uix.floatlayout import FloatLayout
-from kivy.uix.boxlayout import BoxLayout
-from kivy.uix.button import Button
+from kivy.lang import Builder
+from kivy.uix.screenmanager import ScreenManager, Screen
 from kivy.uix.label import Label
+from kivy.uix.button import Button
+from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.textinput import TextInput
-from kivy.uix.spinner import Spinner
 from kivy.uix.scrollview import ScrollView
 from kivy.uix.gridlayout import GridLayout
-from kivy.core.window import Window
 from kivy.core.text import LabelBase
+from kivy.utils import get_color_from_hex
+from kivy.graphics import Color, RoundedRectangle
+from kivy.properties import ListProperty
 import json
 import os
 from datetime import datetime
 import arabic_reshaper
 from bidi.algorithm import get_display
 
-# إعدادات النافذة
-Window.clearcolor = (0.12, 0.12, 0.12, 1)
-Window.softinput_mode = 'resize'
-
-# سجل الخط العربي - لازم ملف Cairo-Regular.ttf يكون حدا الكود
+# تسجيل خط عربي
 font_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'Cairo-Regular.ttf')
 LabelBase.register(name='Cairo', fn_regular=font_path)
 
@@ -28,668 +25,867 @@ def ar(text):
     """دالة تعالج العربية باش تتلصق وتترتب من اليمين"""
     if not text:
         return ""
-    reshaped = arabic_reshaper.reshape(text)
-    return get_display(reshaped)
+    try:
+        # Reshape and apply Bidi algorithm
+        reshaped = arabic_reshaper.reshape(str(text))
+        return get_display(reshaped)
+    except Exception:
+        return str(text)
 
-# مسار التخزين
-app_dir = os.path.join(os.getcwd(), 'nachrilak_data')
-os.makedirs(app_dir, exist_ok=True)
+# ألوان التطبيق
+COLORS = {
+    'bg': get_color_from_hex('#1a1a2e'),
+    'card': get_color_from_hex('#16213e'),
+    'primary': get_color_from_hex('#0f3460'),
+    'accent': get_color_from_hex('#e94560'),
+    'text': get_color_from_hex('#ffffff'),
+    'text_dim': get_color_from_hex('#a0a0a0')
+}
 
-PRODUCTS_FILE = os.path.join(app_dir, 'products.json')
-ORDERS_FILE = os.path.join(app_dir, 'orders.json')
-USERS_FILE = os.path.join(app_dir, 'users.json')
+# ملفات التخزين
+DATA_DIR = os.path.join(os.getcwd(), 'nachrilak_data')
+os.makedirs(DATA_DIR, exist_ok=True)
+USERS_FILE = os.path.join(DATA_DIR, 'users.json')
+PRODUCTS_FILE = os.path.join(DATA_DIR, 'products.json')
+ORDERS_FILE = os.path.join(DATA_DIR, 'orders.json')
 
-def load_products():
-    if os.path.exists(PRODUCTS_FILE):
-        with open(PRODUCTS_FILE, 'r', encoding='utf-8') as f:
-            return json.load(f)
-    return [{'name': 'بيتزا', 'price': 800, 'supplier': 'admin@nachrilak.com', 'payment_methods': ['points'], 'ccp_number': ''}]
-
-def save_products(products_list):
-    with open(PRODUCTS_FILE, 'w', encoding='utf-8') as f:
-        json.dump(products_list, f, ensure_ascii=False, indent=2)
-
-def load_orders():
-    if os.path.exists(ORDERS_FILE):
-        with open(ORDERS_FILE, 'r', encoding='utf-8') as f:
-            return json.load(f)
+def load_json(file):
+    if os.path.exists(file):
+        with open(file, 'r', encoding='utf-8') as f:
+            try:
+                return json.load(f)
+            except Exception:
+                return []
     return []
 
-def save_orders(orders_list):
-    with open(ORDERS_FILE, 'w', encoding='utf-8') as f:
-        json.dump(orders_list, f, ensure_ascii=False, indent=2)
+def save_json(file, data):
+    with open(file, 'w', encoding='utf-8') as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
 
-def load_users():
-    if os.path.exists(USERS_FILE):
-        with open(USERS_FILE, 'r', encoding='utf-8') as f:
-            return json.load(f)
-    return {}
-
-def save_users(users_dict):
-    with open(USERS_FILE, 'w', encoding='utf-8') as f:
-        json.dump(users_dict, f, ensure_ascii=False, indent=2)
-
-users = load_users()
+# متغيرات عامة
 current_user = None
-current_email = None
-user_type = 'زبون'
-products = load_products()
-orders = load_orders()
-selected_product = None
+cart = []
+
+KV = f'''
+ScreenManager:
+    LoginScreen:
+    RegisterScreen:
+    HomeScreen:
+    ProductsScreen:
+    AddProductScreen:
+    CartScreen:
+    OrdersScreen:
+    ProfileScreen:
+
+<SpinnerOption@Button>:
+    font_name: 'Cairo'
+
+<CustomButton@Button>:
+    bg_color: (0.1, 0.6, 0.9, 1)
+    font_name: 'Cairo'
+    font_size: 18
+    size_hint_y: None
+    height: 50
+    background_color: 0,0,0,0
+    canvas.before:
+        Color:
+            rgba: self.bg_color
+        RoundedRectangle:
+            pos: self.pos
+            size: self.size
+            radius: [15]
+
+<CustomLabel@Label>:
+    font_name: 'Cairo'
+    color: 1,1,1,1
+
+<LoginScreen>:
+    name: 'login'
+    BoxLayout:
+        orientation: 'vertical'
+        padding: 30
+        spacing: 20
+        canvas.before:
+            Color:
+                rgba: 0.1, 0.1, 0.18, 1
+            Rectangle:
+                pos: self.pos
+                size: self.size
+
+        Widget:
+            size_hint_y: 0.3
+
+        CustomLabel:
+            text: "{ar('مرحبا بك في نشربلك')}"
+            font_size: 28
+            bold: True
+            size_hint_y: None
+            height: 50
+            halign: 'center'
+
+        CustomLabel:
+            text: "{ar('سجل دخولك للمتابعة')}"
+            font_size: 16
+            color: 0.6,0.6,0.6,1
+            size_hint_y: None
+            height: 30
+            halign: 'center'
+
+        TextInput:
+            id: email
+            hint_text: "{ar('البريد الإلكتروني')}"
+            font_name: 'Cairo'
+            hint_text_font_name: 'Cairo'
+            font_size: 18
+            multiline: False
+            size_hint_y: None
+            height: 50
+            background_color: 0.15,0.15,0.25,1
+            foreground_color: 1,1,1,1
+            padding: 15
+
+        TextInput:
+            id: password
+            hint_text: "{ar('كلمة السر')}"
+            password: True
+            font_name: 'Cairo'
+            hint_text_font_name: 'Cairo'
+            font_size: 18
+            multiline: False
+            size_hint_y: None
+            height: 50
+            background_color: 0.15,0.15,0.25,1
+            foreground_color: 1,1,1,1
+            padding: 15
+
+        CustomButton:
+            text: "{ar('تسجيل الدخول')}"
+            bg_color: (0.1, 0.6, 0.9, 1)
+            on_release: root.login()
+
+        CustomButton:
+            text: "{ar('ليس لديك حساب؟ سجل الآن')}"
+            bg_color: (0.2,0.2,0.3,1)
+            on_release: root.manager.current = 'register'
+
+        Widget:
+            size_hint_y: 0.3
+
+<RegisterScreen>:
+    name: 'register'
+    BoxLayout:
+        orientation: 'vertical'
+        padding: 30
+        spacing: 15
+        canvas.before:
+            Color:
+                rgba: 0.1, 0.1, 0.18, 1
+            Rectangle:
+                pos: self.pos
+                size: self.size
+
+        CustomLabel:
+            text: "{ar('إنشاء حساب جديد')}"
+            font_size: 26
+            bold: True
+            size_hint_y: None
+            height: 50
+
+        TextInput:
+            id: name
+            hint_text: "{ar('الاسم الكامل')}"
+            font_name: 'Cairo'
+            hint_text_font_name: 'Cairo'
+            multiline: False
+            size_hint_y: None
+            height: 50
+            background_color: 0.15,0.15,0.25,1
+            foreground_color: 1,1,1,1
+            padding: 15
+
+        TextInput:
+            id: email
+            hint_text: "{ar('البريد الإلكتروني')}"
+            font_name: 'Cairo'
+            hint_text_font_name: 'Cairo'
+            multiline: False
+            size_hint_y: None
+            height: 50
+            background_color: 0.15,0.15,0.25,1
+            foreground_color: 1,1,1,1
+            padding: 15
+
+        TextInput:
+            id: password
+            hint_text: "{ar('كلمة السر')}"
+            password: True
+            font_name: 'Cairo'
+            hint_text_font_name: 'Cairo'
+            multiline: False
+            size_hint_y: None
+            height: 50
+            background_color: 0.15,0.15,0.25,1
+            foreground_color: 1,1,1,1
+            padding: 15
+
+        TextInput:
+            id: phone
+            hint_text: "{ar('رقم الهاتف')}"
+            font_name: 'Cairo'
+            hint_text_font_name: 'Cairo'
+            multiline: False
+            input_type: 'number'
+            size_hint_y: None
+            height: 50
+            background_color: 0.15,0.15,0.25,1
+            foreground_color: 1,1,1,1
+            padding: 15
+
+        Spinner:
+            id: user_type
+            text: "{ar('اختر نوع الحساب')}"
+            values: ["{ar('زبون')}", "{ar('تاجر')}", "{ar('سائق')}"]
+            font_name: 'Cairo'
+            option_cls: 'SpinnerOption'
+            size_hint_y: None
+            height: 50
+            background_color: 0.15,0.15,0.25,1
+            color: 1,1,1,1
+
+        CustomButton:
+            text: "{ar('إنشاء الحساب')}"
+            bg_color: (0.1, 0.6, 0.9, 1)
+            on_release: root.register()
+
+        CustomButton:
+            text: "{ar('رجوع لتسجيل الدخول')}"
+            bg_color: (0.2,0.2,0.3,1)
+            on_release: root.manager.current = 'login'
+
+<HomeScreen>:
+    name: 'home'
+    BoxLayout:
+        orientation: 'vertical'
+        canvas.before:
+            Color:
+                rgba: 0.1, 0.1, 0.18, 1
+            Rectangle:
+                pos: self.pos
+                size: self.size
+
+        BoxLayout:
+            size_hint_y: None
+            height: 60
+            padding: 10
+            canvas.before:
+                Color:
+                    rgba: 0.15,0.15,0.25,1
+                Rectangle:
+                    pos: self.pos
+                    size: self.size
+
+            CustomLabel:
+                id: welcome
+                text: "{ar('مرحبا')}"
+                font_size: 20
+                bold: True
+
+        ScrollView:
+            GridLayout:
+                cols: 2
+                spacing: 15
+                padding: 20
+                size_hint_y: None
+                height: self.minimum_height
+
+                CustomButton:
+                    text: "{ar('المنتجات')}"
+                    bg_color: (0.1, 0.5, 0.8, 1)
+                    height: 120
+                    on_release: root.manager.current = 'products'
+
+                CustomButton:
+                    text: "{ar('سلة المشتريات')}"
+                    bg_color: (0.9, 0.3, 0.4, 1)
+                    height: 120
+                    on_release: root.manager.current = 'cart'
+
+                CustomButton:
+                    text: "{ar('طلباتي')}"
+                    bg_color: (0.2, 0.7, 0.5, 1)
+                    height: 120
+                    on_release: root.manager.current = 'orders'
+
+                CustomButton:
+                    text: "{ar('الملف الشخصي')}"
+                    bg_color: (0.8, 0.5, 0.1, 1)
+                    height: 120
+                    on_release: root.manager.current = 'profile'
+
+        BoxLayout:
+            size_hint_y: None
+            height: 80
+            padding: 15
+            spacing: 10
+
+            CustomButton:
+                text: "{ar('إضافة منتج')}"
+                bg_color: (0.8, 0.5, 0.1, 1)
+                id: add_btn
+                on_release: root.manager.current = 'add_product'
+
+            CustomButton:
+                text: "{ar('تسجيل الخروج')}"
+                bg_color: (0.5,0.2,0.2,1)
+                on_release: root.logout()
+
+<ProductsScreen>:
+    name: 'products'
+    BoxLayout:
+        orientation: 'vertical'
+        canvas.before:
+            Color:
+                rgba: 0.1, 0.1, 0.18, 1
+            Rectangle:
+                pos: self.pos
+                size: self.size
+
+        BoxLayout:
+            size_hint_y: None
+            height: 60
+            padding: 10
+            canvas.before:
+                Color:
+                    rgba: 0.15,0.15,0.25,1
+                Rectangle:
+                    pos: self.pos
+                    size: self.size
+
+            CustomButton:
+                text: "{ar('رجوع')}"
+                size_hint_x: 0.2
+                bg_color: (0.3,0.3,0.4,1)
+                on_release: root.manager.current = 'home'
+
+            CustomLabel:
+                text: "{ar('المنتجات المتاحة')}"
+                font_size: 20
+                bold: True
+
+        ScrollView:
+            id: scroll
+            GridLayout:
+                id: products_grid
+                cols: 1
+                spacing: 10
+                padding: 15
+                size_hint_y: None
+                height: self.minimum_height
+
+<AddProductScreen>:
+    name: 'add_product'
+    BoxLayout:
+        orientation: 'vertical'
+        padding: 20
+        spacing: 15
+        canvas.before:
+            Color:
+                rgba: 0.1, 0.1, 0.18, 1
+            Rectangle:
+                pos: self.pos
+                size: self.size
+
+        BoxLayout:
+            size_hint_y: None
+            height: 60
+            canvas.before:
+                Color:
+                    rgba: 0.15,0.15,0.25,1
+                Rectangle:
+                    pos: self.pos
+                    size: self.size
+
+            CustomButton:
+                text: "{ar('رجوع')}"
+                size_hint_x: 0.2
+                bg_color: (0.3,0.3,0.4,1)
+                on_release: root.manager.current = 'home'
+
+            CustomLabel:
+                text: "{ar('إضافة منتج جديد')}"
+                font_size: 20
+                bold: True
+
+        TextInput:
+            id: name
+            hint_text: "{ar('اسم المنتج')}"
+            font_name: 'Cairo'
+            hint_text_font_name: 'Cairo'
+            multiline: False
+            size_hint_y: None
+            height: 50
+            background_color: 0.15,0.15,0.25,1
+            foreground_color: 1,1,1,1
+            padding: 15
+
+        TextInput:
+            id: price
+            hint_text: "{ar('السعر بالدينار')}"
+            font_name: 'Cairo'
+            hint_text_font_name: 'Cairo'
+            input_type: 'number'
+            multiline: False
+            size_hint_y: None
+            height: 50
+            background_color: 0.15,0.15,0.25,1
+            foreground_color: 1,1,1,1
+            padding: 15
+
+        TextInput:
+            id: desc
+            hint_text: "{ar('وصف المنتج')}"
+            font_name: 'Cairo'
+            hint_text_font_name: 'Cairo'
+            size_hint_y: None
+            height: 100
+            background_color: 0.15,0.15,0.25,1
+            foreground_color: 1,1,1,1
+            padding: 15
+
+        CustomButton:
+            text: "{ar('حفظ المنتج')}"
+            bg_color: (0.1, 0.6, 0.9, 1)
+            on_release: root.add_product()
+
+<CartScreen>:
+    name: 'cart'
+    BoxLayout:
+        orientation: 'vertical'
+        canvas.before:
+            Color:
+                rgba: 0.1, 0.1, 0.18, 1
+            Rectangle:
+                pos: self.pos
+                size: self.size
+
+        BoxLayout:
+            size_hint_y: None
+            height: 60
+            padding: 10
+            canvas.before:
+                Color:
+                    rgba: 0.15,0.15,0.25,1
+                Rectangle:
+                    pos: self.pos
+                    size: self.size
+
+            CustomButton:
+                text: "{ar('رجوع')}"
+                size_hint_x: 0.2
+                bg_color: (0.3,0.3,0.4,1)
+                on_release: root.manager.current = 'home'
+
+            CustomLabel:
+                text: "{ar('سلة المشتريات')}"
+                font_size: 20
+                bold: True
+
+        ScrollView:
+            id: scroll
+            GridLayout:
+                id: cart_grid
+                cols: 1
+                spacing: 10
+                padding: 15
+                size_hint_y: None
+                height: self.minimum_height
+
+        BoxLayout:
+            size_hint_y: None
+            height: 80
+            padding: 15
+            spacing: 10
+
+            CustomLabel:
+                id: total
+                text: "{ar('الإجمالي: 0 دج')}"
+                font_size: 18
+                bold: True
+
+            CustomButton:
+                text: "{ar('تأكيد الطلب')}"
+                bg_color: (0.1, 0.7, 0.4, 1)
+                on_release: root.confirm_order()
+
+<OrdersScreen>:
+    name: 'orders'
+    BoxLayout:
+        orientation: 'vertical'
+        canvas.before:
+            Color:
+                rgba: 0.1, 0.1, 0.18, 1
+            Rectangle:
+                pos: self.pos
+                size: self.size
+
+        BoxLayout:
+            size_hint_y: None
+            height: 60
+            padding: 10
+            canvas.before:
+                Color:
+                    rgba: 0.15,0.15,0.25,1
+                Rectangle:
+                    pos: self.pos
+                    size: self.size
+
+            CustomButton:
+                text: "{ar('رجوع')}"
+                size_hint_x: 0.2
+                bg_color: (0.3,0.3,0.4,1)
+                on_release: root.manager.current = 'home'
+
+            CustomLabel:
+                text: "{ar('طلباتي')}"
+                font_size: 20
+                bold: True
+
+        ScrollView:
+            id: scroll
+            GridLayout:
+                id: orders_grid
+                cols: 1
+                spacing: 10
+                padding: 15
+                size_hint_y: None
+                height: self.minimum_height
+
+<ProfileScreen>:
+    name: 'profile'
+    BoxLayout:
+        orientation: 'vertical'
+        padding: 30
+        spacing: 20
+        canvas.before:
+            Color:
+                rgba: 0.1, 0.1, 0.18, 1
+            Rectangle:
+                pos: self.pos
+                size: self.size
+
+        BoxLayout:
+            size_hint_y: None
+            height: 60
+            padding: 10
+            canvas.before:
+                Color:
+                    rgba: 0.15,0.15,0.25,1
+                Rectangle:
+                    pos: self.pos
+                    size: self.size
+
+            CustomButton:
+                text: "{ar('رجوع')}"
+                size_hint_x: 0.2
+                bg_color: (0.3,0.3,0.4,1)
+                on_release: root.manager.current = 'home'
+
+            CustomLabel:
+                text: "{ar('الملف الشخصي')}"
+                font_size: 24
+                bold: True
+
+        ScrollView:
+            BoxLayout:
+                orientation: 'vertical'
+                size_hint_y: None
+                height: self.minimum_height
+                spacing: 20
+
+                CustomLabel:
+                    id: user_name
+                    text: ""
+                    font_size: 22
+                    size_hint_y: None
+                    height: 50
+                    halign: 'right'
+
+                CustomLabel:
+                    id: user_email
+                    text: ""
+                    font_size: 18
+                    color: 0.7,0.7,0.7,1
+                    size_hint_y: None
+                    height: 40
+                    halign: 'right'
+
+                CustomLabel:
+                    id: user_type
+                    text: ""
+                    font_size: 18
+                    size_hint_y: None
+                    height: 40
+                    halign: 'right'
+
+                CustomLabel:
+                    id: user_phone
+                    text: ""
+                    font_size: 18
+                    size_hint_y: None
+                    height: 40
+                    halign: 'right'
+
+                CustomLabel:
+                    id: user_balance
+                    text: ""
+                    font_size: 18
+                    color: 0.2, 0.8, 0.2, 1
+                    size_hint_y: None
+                    height: 40
+                    halign: 'right'
+'''
 
 class BaseScreen(Screen):
-    def add_back_button(self, target='home_screen'):
-        back_btn = Button(
-            text=ar('< رجوع'),
-            font_name='Cairo',
-            font_size=18,
-            size_hint=(0.25, 0.09),
-            pos_hint={'x': 0.02, 'top': 0.98},
-            background_normal='',
-            background_color=(0.2, 0.2, 0.2, 1)
-        )
-        back_btn.bind(on_press=lambda x: self.go_back(target))
-        self.add_widget(back_btn)
-
-    def go_back(self, target):
-        self.manager.transition = SlideTransition(direction='right')
-        self.manager.current = target
-
-    def switch(self, screen):
-        self.manager.transition = SlideTransition(direction='left')
-        self.manager.current = screen
+    def show_popup(self, title, msg):
+        from kivy.uix.popup import Popup
+        popup = Popup(title=ar(title), content=Label(text=ar(msg), font_name='Cairo'),
+                     size_hint=(0.8, 0.4))
+        popup.open()
 
 class LoginScreen(BaseScreen):
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        self.layout = FloatLayout()
-        scroll = ScrollView(do_scroll_x=False)
-        scroll_content = FloatLayout(size_hint_y=None, height=800)
+    def login(self):
+        global current_user
+        email = self.ids.email.text.strip()
+        password = self.ids.password.text.strip()
 
-        scroll_content.add_widget(Label(
-            text=ar('نشريلك'),
-            font_name='Cairo',
-            font_size=40,
-            bold=True,
-            size_hint=(0.9, 0.12),
-            pos_hint={'center_x': 0.5, 'top': 0.95}
-        ))
+        users = load_json(USERS_FILE)
+        user = next((u for u in users if u['email'] == email and u['password'] == password), None)
 
-        self.type_spinner = Spinner(
-            text=ar('زبون'),
-            values=[ar('زبون'), ar('تاجر'), ar('سائق')],
-            font_name='Cairo',
-            font_size=22,
-            background_normal='',
-            background_color=(0.15, 0.15, 0.15, 1),
-            size_hint=(0.9, 0.13),
-            pos_hint={'center_x': 0.5, 'top': 0.8}
-        )
-        scroll_content.add_widget(self.type_spinner)
+        if user:
+            current_user = user
+            self.manager.get_screen('home').ids.welcome.text = ar(f'مرحبا {user["name"]}')
 
-        self.email_input = TextInput(
-            hint_text=ar('البريد الإلكتروني'),
-            font_name='Cairo',
-            multiline=False,
-            font_size=24,
-            padding=[20, 25],
-            background_color=(1, 1, 1, 1),
-            size_hint=(0.9, 0.15),
-            pos_hint={'center_x': 0.5, 'top': 0.63}
-        )
-        scroll_content.add_widget(self.email_input)
+            # Update profile info
+            profile = self.manager.get_screen('profile')
+            profile.ids.user_name.text = ar(f"الاسم: {user['name']}")
+            profile.ids.user_email.text = f"البريد: {user['email']}"
 
-        self.password_input = TextInput(
-            hint_text=ar('كلمة المرور'),
-            font_name='Cairo',
-            password=True,
-            multiline=False,
-            font_size=24,
-            padding=[20, 25],
-            background_color=(1, 1, 1, 1),
-            size_hint=(0.9, 0.15),
-            pos_hint={'center_x': 0.5, 'top': 0.44}
-        )
-        scroll_content.add_widget(self.password_input)
+            types_map = {'customer': 'زبون', 'supplier': 'تاجر', 'driver': 'سائق'}
+            display_type = types_map.get(user['type'], user['type'])
+            profile.ids.user_type.text = ar(f"نوع الحساب: {display_type}")
+            profile.ids.user_phone.text = ar(f"رقم الهاتف: {user['phone']}")
+            profile.ids.user_balance.text = ar(f"الرصيد: {user['balance']} دج")
 
-        def update_fields(instance, value):
-            global user_type
-            if value == ar('زبون'): user_type = 'زبون'
-            elif value == ar('تاجر'): user_type = 'تاجر'
-            elif value == ar('سائق'): user_type = 'سائق'
-        self.type_spinner.bind(text=update_fields)
+            # Update add button visibility
+            add_btn = self.manager.get_screen('home').ids.add_btn
+            if user['type'] in ['supplier', 'admin']:
+                add_btn.opacity = 1
+                add_btn.disabled = False
+            else:
+                add_btn.opacity = 0
+                add_btn.disabled = True
 
-        login_btn = Button(
-            text=ar('دخول'),
-            font_name='Cairo',
-            font_size=24,
-            bold=True,
-            size_hint=(0.9, 0.15),
-            pos_hint={'center_x': 0.5, 'y': 0.08},
-            background_normal='',
-            background_color=(0.0, 0.4, 0.8, 1)
-        )
-        login_btn.bind(on_press=self.login)
-        scroll_content.add_widget(login_btn)
+            self.manager.current = 'home'
+            self.ids.email.text = ''
+            self.ids.password.text = ''
+        else:
+            self.show_popup('خطأ', 'البريد أو كلمة السر غير صحيحة')
 
-        scroll.add_widget(scroll_content)
-        self.layout.add_widget(scroll)
-        self.add_widget(self.layout)
+class RegisterScreen(BaseScreen):
+    def register(self):
+        name = self.ids.name.text.strip()
+        email = self.ids.email.text.strip()
+        password = self.ids.password.text.strip()
+        phone = self.ids.phone.text.strip()
+        user_type_display = self.ids.user_type.text
 
-    def login(self, instance):
-        global current_user, current_email
-        email = self.email_input.text.strip()
-        password = self.password_input.text.strip()
-        if not email or not password:
-            self.email_input.hint_text = ar('املأ الكل')
+        if not all([name, email, password, phone]) or user_type_display == ar('اختر نوع الحساب'):
+            self.show_popup('خطأ', 'املأ جميع الحقول')
             return
-        if email not in users:
-            balance = 100 if user_type == 'زبون' else 0
-            users[email] = {'password': password, 'balance': balance, 'type': user_type}
-            save_users(users)
-        elif users[email]['password']!= password:
-            self.password_input.text = ''
-            self.password_input.hint_text = ar('خطأ')
+
+        # Correctly map display types to logical types
+        types_map = {'زبون': 'customer', 'تاجر': 'supplier', 'سائق': 'driver'}
+        logical_type = 'customer'
+        for k, v in types_map.items():
+            if ar(k) == user_type_display:
+                logical_type = v
+                break
+
+        users = load_json(USERS_FILE)
+        if any(u['email'] == email for u in users):
+            self.show_popup('خطأ', 'البريد موجود مسبقا')
             return
-        current_user = users[email]
-        current_email = email
-        self.manager.current = 'home_screen'
+
+        users.append({
+            'id': len(users) + 1,
+            'name': name,
+            'email': email,
+            'password': password,
+            'phone': phone,
+            'type': logical_type,
+            'balance': 0
+        })
+        save_json(USERS_FILE, users)
+        self.show_popup('نجاح', 'تم إنشاء الحساب بنجاح')
+        self.manager.current = 'login'
 
 class HomeScreen(BaseScreen):
-    def on_pre_enter(self):
-        self.clear_widgets()
-        layout = FloatLayout()
-        self.add_back_button('login_screen')
-
-        btn1 = Button(
-            text=ar('المنتجات'),
-            font_name='Cairo',
-            font_size=24, bold=True,
-            size_hint=(0.85, 0.15),
-            pos_hint={'center_x': 0.5, 'top': 0.85},
-            background_normal='', background_color=(0.25, 0.25, 0.25, 1)
-        )
-        btn1.bind(on_press=lambda x: self.switch('products_screen'))
-        layout.add_widget(btn1)
-
-        if current_user and current_user['type'] == 'تاجر':
-            btn_orders = Button(
-                text=ar('الطلبات'),
-                font_name='Cairo',
-                font_size=24, bold=True,
-                size_hint=(0.85, 0.15),
-                pos_hint={'center_x': 0.5, 'center_y': 0.65},
-                background_normal='', background_color=(0.8, 0.4, 0.0, 1)
-            )
-            btn_orders.bind(on_press=lambda x: self.switch('supplier_orders_screen'))
-            layout.add_widget(btn_orders)
-
-            btn_add = Button(
-                text=ar('أضف منتج'),
-                font_name='Cairo',
-                font_size=24, bold=True,
-                size_hint=(0.85, 0.15),
-                pos_hint={'center_x': 0.5, 'center_y': 0.45},
-                background_normal='', background_color=(0.0, 0.6, 0.3, 1)
-            )
-            btn_add.bind(on_press=lambda x: self.switch('add_product_screen'))
-            layout.add_widget(btn_add)
-            settings_y = 0.25
-        elif current_user and current_user['type'] == 'سائق':
-            btn_orders = Button(
-                text=ar('الطلبات'),
-                font_name='Cairo',
-                font_size=24, bold=True,
-                size_hint=(0.85, 0.15),
-                pos_hint={'center_x': 0.5, 'center_y': 0.65},
-                background_normal='', background_color=(0.0, 0.5, 0.8, 1)
-            )
-            btn_orders.bind(on_press=lambda x: self.switch('driver_orders_screen'))
-            layout.add_widget(btn_orders)
-            settings_y = 0.45
-        else:
-            settings_y = 0.65
-
-        btn2 = Button(
-            text=ar('الإعدادات'),
-            font_name='Cairo',
-            font_size=24, bold=True,
-            size_hint=(0.85, 0.15),
-            pos_hint={'center_x': 0.5, 'center_y': settings_y},
-            background_normal='', background_color=(0.25, 0.25, 0.25, 1)
-        )
-        btn2.bind(on_press=lambda x: self.switch('settings_screen'))
-        layout.add_widget(btn2)
-        self.add_widget(layout)
+    def logout(self):
+        global current_user, cart
+        current_user = None
+        cart = []
+        self.manager.current = 'login'
 
 class ProductsScreen(BaseScreen):
     def on_pre_enter(self):
-        self.clear_widgets()
-        layout = FloatLayout()
-        self.add_back_button('home_screen')
+        self.load_products()
 
-        if current_user and current_user['type'] == 'زبون':
-            add_order_btn = Button(
-                text=ar('أضف طلب'),
-                font_name='Cairo',
-                font_size=22, bold=True,
-                size_hint=(0.9, 0.1),
-                pos_hint={'center_x': 0.5, 'top': 0.88},
-                background_normal='', background_color=(0.8, 0.2, 0.2, 1)
-            )
-            add_order_btn.bind(on_press=lambda x: self.switch('search_product_screen'))
-            layout.add_widget(add_order_btn)
-            scroll_y = 0.4
-        else:
-            scroll_y = 0.5
+    def load_products(self):
+        grid = self.ids.products_grid
+        grid.clear_widgets()
+        products = load_json(PRODUCTS_FILE)
 
-        scroll = ScrollView(size_hint=(0.9, 0.65), pos_hint={'center_x': 0.5, 'center_y': scroll_y})
-        grid = GridLayout(cols=1, size_hint_y=None, spacing=12, padding=20)
-        grid.bind(minimum_height=grid.setter('height'))
+        if not products:
+            grid.add_widget(Label(text=ar('لا توجد منتجات'), font_name='Cairo', size_hint_y=None, height=50))
+            return
 
         for p in products:
-            grid.add_widget(Label(
-                text=ar(f"{p['name']} - {p['price']} نقطة"),
-                font_name='Cairo',
-                font_size=22, size_hint_y=None, height=70
-            ))
-        scroll.add_widget(grid)
-        layout.add_widget(scroll)
-        self.add_widget(layout)
+            box = BoxLayout(orientation='vertical', size_hint_y=None, height=120, padding=10)
+
+            # Closure fix for dynamic background
+            with box.canvas.before:
+                Color(rgba=COLORS['card'])
+                rect = RoundedRectangle(pos=box.pos, size=box.size, radius=[15])
+
+            box.bind(pos=lambda inst, pos, r=rect: setattr(r, 'pos', pos),
+                     size=lambda inst, size, r=rect: setattr(r, 'size', size))
+
+            box.add_widget(Label(text=ar(p['name']), font_name='Cairo', font_size=18, bold=True, size_hint_y=0.4))
+            box.add_widget(Label(text=ar(p.get('desc', '')), font_name='Cairo', font_size=14, color=(0.7,0.7,0.7,1), size_hint_y=0.3))
+
+            btn_box = BoxLayout(size_hint_y=0.3, spacing=10)
+            btn_box.add_widget(Label(text=ar(f"{p['price']} دج"), font_name='Cairo', bold=True))
+            btn = Button(text=ar('إضافة للسلة'), font_name='Cairo', background_color=COLORS['accent'])
+            btn.bind(on_release=lambda x, prod=p: self.add_to_cart(prod))
+            btn_box.add_widget(btn)
+            box.add_widget(btn_box)
+            grid.add_widget(box)
+
+    def add_to_cart(self, product):
+        cart.append(product)
+        self.show_popup('تم', f"تم إضافة {product['name']} للسلة")
 
 class AddProductScreen(BaseScreen):
+    def add_product(self):
+        if not current_user or current_user['type'] not in ['supplier', 'admin']:
+            self.show_popup('خطأ', 'ليس لديك صلاحية')
+            return
+
+        name = self.ids.name.text.strip()
+        price = self.ids.price.text.strip()
+        desc = self.ids.desc.text.strip()
+
+        if not all([name, price]):
+            self.show_popup('خطأ', 'املأ اسم وسعر المنتج')
+            return
+
+        products = load_json(PRODUCTS_FILE)
+        products.append({
+            'id': len(products) + 1,
+            'name': name,
+            'price': int(price),
+            'desc': desc,
+            'supplier': current_user['email']
+        })
+        save_json(PRODUCTS_FILE, products)
+        self.show_popup('نجاح', 'تم إضافة المنتج')
+        self.ids.name.text = ''
+        self.ids.price.text = ''
+        self.ids.desc.text = ''
+
+class CartScreen(BaseScreen):
     def on_pre_enter(self):
-        self.clear_widgets()
-        layout_float = FloatLayout()
-        self.add_back_button('home_screen')
+        self.load_cart()
 
-        scroll = ScrollView(do_scroll_x=False, size_hint=(1, 0.85), pos_hint={'top': 0.85})
-        layout = BoxLayout(orientation='vertical', padding=40, spacing=20, size_hint_y=None)
-        layout.bind(minimum_height=layout.setter('height'))
+    def load_cart(self):
+        grid = self.ids.cart_grid
+        grid.clear_widgets()
+        total = sum(p['price'] for p in cart)
+        self.ids.total.text = ar(f'الإجمالي: {total} دج')
 
-        layout.add_widget(Label(text=ar('إضافة منتج'), font_name='Cairo', font_size=30, bold=True, size_hint_y=None, height=70))
+        if not cart:
+            grid.add_widget(Label(text=ar('السلة فارغة'), font_name='Cairo', size_hint_y=None, height=50))
+            return
 
-        self.name_input = TextInput(hint_text=ar('اسم المنتج'), font_name='Cairo', font_size=22, padding=[20, 25], background_color=(1, 1, 1, 1), size_hint_y=None, height=85)
-        layout.add_widget(self.name_input)
+        for i, p in enumerate(cart):
+            box = BoxLayout(size_hint_y=None, height=60, padding=10)
+            box.add_widget(Label(text=ar(p['name']), font_name='Cairo'))
+            box.add_widget(Label(text=ar(f"{p['price']} دج"), font_name='Cairo'))
+            btn = Button(text=ar('حذف'), size_hint_x=0.2, background_color=(0.8,0.2,0.2,1))
+            btn.bind(on_release=lambda x, idx=i: self.remove_item(idx))
+            box.add_widget(btn)
+            grid.add_widget(box)
 
-        self.price_input = TextInput(hint_text=ar('السعر بالنقاط'), font_name='Cairo', input_filter='int', font_size=22, padding=[20, 25], background_color=(1, 1, 1, 1), size_hint_y=None, height=85)
-        layout.add_widget(self.price_input)
+    def remove_item(self, idx):
+        cart.pop(idx)
+        self.load_cart()
 
-        layout.add_widget(Label(text=ar('طرق الدفع'), font_name='Cairo', font_size=22, bold=True, size_hint_y=None, height=50))
-        self.pay_points = Button(text=ar('[ ] نقاط'), font_name='Cairo', font_size=20, size_hint_y=None, height=70, background_color=(0.3,0.3,0.3,1))
-        self.pay_ccp = Button(text=ar('[ ] CCP'), font_name='Cairo', font_size=20, size_hint_y=None, height=70, background_color=(0.3,0.3,0.3,1))
-        self.pay_cash = Button(text=ar('[ ] كاش'), font_name='Cairo', font_size=20, size_hint_y=None, height=70, background_color=(0.3,0.3,0.3,1))
+    def confirm_order(self):
+        if not cart:
+            self.show_popup('خطأ', 'السلة فارغة')
+            return
 
-        self.pay_points.bind(on_press=lambda x: self.toggle_btn(self.pay_points))
-        self.pay_ccp.bind(on_press=lambda x: self.toggle_btn(self.pay_ccp))
-        self.pay_cash.bind(on_press=lambda x: self.toggle_btn(self.pay_cash))
+        orders = load_json(ORDERS_FILE)
+        order = {
+            'id': len(orders) + 1,
+            'customer': current_user['email'],
+            'products': cart.copy(),
+            'total': sum(p['price'] for p in cart),
+            'status': 'قيد المعالجة',
+            'date': datetime.now().strftime('%Y-%m-%d %H:%M')
+        }
+        orders.append(order)
+        save_json(ORDERS_FILE, orders)
+        cart.clear()
+        self.show_popup('نجاح', 'تم تأكيد الطلب بنجاح')
+        self.manager.current = 'home'
 
-        layout.add_widget(self.pay_points)
-        layout.add_widget(self.pay_ccp)
-        layout.add_widget(self.pay_cash)
-
-        self.ccp_input = TextInput(hint_text=ar('رقم CCP'), font_name='Cairo', font_size=22, padding=[20, 25], background_color=(1, 1, 1, 1), size_hint_y=None, height=85)
-        layout.add_widget(self.ccp_input)
-
-        add_btn = Button(text=ar('إضافة'), font_name='Cairo', font_size=24, bold=True, size_hint_y=None, height=85, background_normal='', background_color=(0.0, 0.6, 0.4, 1))
-        add_btn.bind(on_press=self.add_product)
-        layout.add_widget(add_btn)
-
-        layout.add_widget(Label(size_hint_y=None, height=100))
-        scroll.add_widget(layout)
-        layout_float.add_widget(scroll)
-        self.add_widget(layout_float)
-
-    def toggle_btn(self, btn):
-        if '[ ]' in get_display(arabic_reshaper.reshape(btn.text)): # Check logically if possible, but let's be simpler
-            pass
-        # Better toggle check
-        if 'x' in btn.text:
-             btn.text = btn.text.replace('x', ' ')
-             btn.background_color = (0.3, 0.3, 0.3, 1)
-        else:
-             btn.text = btn.text.replace(' ', 'x')
-             btn.background_color = (0.0, 0.6, 0.4, 1)
-
-    def add_product(self, x):
-        name = self.name_input.text.strip()
-        try:
-            price = int(self.price_input.text)
-            methods = []
-            if 'x' in self.pay_points.text: methods.append('points')
-            if 'x' in self.pay_ccp.text: methods.append('ccp')
-            if 'x' in self.pay_cash.text: methods.append('cash')
-
-            if name and price > 0 and methods and current_email:
-                products.append({
-                    'name': name,
-                    'price': price,
-                    'supplier': current_email,
-                    'payment_methods': methods,
-                    'ccp_number': self.ccp_input.text.strip() if 'ccp' in methods else ''
-                })
-                save_products(products)
-                self.switch('home_screen')
-        except:
-            self.price_input.hint_text = ar('خطأ')
-
-class SearchProductScreen(BaseScreen):
+class OrdersScreen(BaseScreen):
     def on_pre_enter(self):
-        self.clear_widgets()
-        self.add_back_button('products_screen')
+        self.load_orders()
 
-        layout = BoxLayout(orientation='vertical', padding=30, spacing=15)
-        layout.add_widget(Label(text=ar('اختر المنتج'), font_name='Cairo', font_size=28, bold=True, size_hint_y=None, height=60))
+    def load_orders(self):
+        grid = self.ids.orders_grid
+        grid.clear_widgets()
+        orders = load_json(ORDERS_FILE)
+        user_orders = [o for o in orders if o['customer'] == current_user['email']]
 
-        scroll = ScrollView()
-        grid = GridLayout(cols=1, size_hint_y=None, spacing=10, padding=10)
-        grid.bind(minimum_height=grid.setter('height'))
+        if not user_orders:
+            grid.add_widget(Label(text=ar('لا توجد طلبات'), font_name='Cairo', size_hint_y=None, height=50))
+            return
 
-        for idx, p in enumerate(products):
-            btn = Button(
-                text=ar(f"{p['name']} - {p['price']} نقطة"),
-                font_name='Cairo',
-                font_size=20,
-                size_hint_y=None,
-                height=70,
-                background_normal='',
-                background_color=(0.3, 0.3, 0.3, 1)
-            )
-            btn.bind(on_press=lambda x, i=idx: self.select_product(i))
-            grid.add_widget(btn)
+        for o in user_orders:
+            box = BoxLayout(orientation='vertical', size_hint_y=None, height=100, padding=10)
 
-        scroll.add_widget(grid)
-        layout.add_widget(scroll)
-        self.add_widget(layout)
+            with box.canvas.before:
+                Color(rgba=COLORS['card'])
+                rect = RoundedRectangle(pos=box.pos, size=box.size, radius=[15])
 
-    def select_product(self, idx):
-        global selected_product
-        selected_product = products[idx]
-        self.switch('confirm_order_screen')
+            box.bind(pos=lambda inst, pos, r=rect: setattr(r, 'pos', pos),
+                     size=lambda inst, size, r=rect: setattr(r, 'size', size))
 
-class ConfirmOrderScreen(BaseScreen):
-    def on_pre_enter(self):
-        self.clear_widgets()
-        self.add_back_button('search_product_screen')
+            box.add_widget(Label(text=ar(f"طلب رقم {o['id']} - {o['date']}"), font_name='Cairo', bold=True, size_hint_y=0.3))
+            box.add_widget(Label(text=ar(f"عدد المنتجات: {len(o['products'])}"), font_name='Cairo', size_hint_y=0.3))
+            box.add_widget(Label(text=ar(f"الإجمالي: {o['total']} دج - الحالة: {o['status']}"), font_name='Cairo', color=(0.2,0.8,0.4,1), size_hint_y=0.4))
+            grid.add_widget(box)
 
-        scroll = ScrollView(do_scroll_x=False)
-        layout = BoxLayout(orientation='vertical', padding=40, spacing=20, size_hint_y=None)
-        layout.bind(minimum_height=layout.setter('height'))
+class ProfileScreen(BaseScreen):
+    pass
 
-        if selected_product:
-            layout.add_widget(Label(text=ar(f"المنتج: {selected_product['name']}"), font_name='Cairo', font_size=26, bold=True, size_hint_y=None, height=60))
-            layout.add_widget(Label(text=ar(f"السعر: {selected_product['price']} نقطة"), font_name='Cairo', font_size=24, size_hint_y=None, height=50))
-            layout.add_widget(Label(text=ar(f"رصيدك: {current_user['balance']} نقطة"), font_name='Cairo', font_size=22, size_hint_y=None, height=50))
-
-            layout.add_widget(Label(text=ar('طريقة الدفع'), font_name='Cairo', font_size=22, bold=True, size_hint_y=None, height=50))
-
-            vals = []
-            display_to_logical = {}
-            for v in selected_product['payment_methods']:
-                if v == 'points': d = ar('نقاط')
-                elif v == 'ccp': d = 'CCP'
-                elif v == 'cash': d = ar('كاش')
-                else: d = v
-                vals.append(d)
-                display_to_logical[d] = v
-
-            self.pay_choice = Spinner(
-                text=vals[0] if vals else "",
-                values=vals,
-                font_name='Cairo',
-                font_size=22,
-                size_hint_y=None,
-                height=80,
-                background_color=(0.15, 0.15, 0.15, 1)
-            )
-            layout.add_widget(self.pay_choice)
-
-            if 'ccp' in selected_product['payment_methods']:
-                layout.add_widget(Label(text=ar(f"رقم CCP: {selected_product.get('ccp_number', 'لا يوجد')}"), font_name='Cairo', font_size=18, color=(1,0,0,1), size_hint_y=None, height=40))
-
-            confirm_btn = Button(text=ar('تأكيد الطلب'), font_name='Cairo', font_size=24, bold=True, size_hint_y=None, height=80, background_color=(0.0, 0.6, 0.3, 1))
-
-            def confirm_order(x):
-                global orders
-                order = {
-                    'id': len(orders) + 1,
-                    'customer': current_email,
-                    'product': selected_product['name'],
-                    'price': selected_product['price'],
-                    'supplier': selected_product['supplier'],
-                    'driver': None,
-                    'payment_method': display_to_logical.get(self.pay_choice.text, self.pay_choice.text),
-                    'status': 'قيد الانتظار',
-                    'time': datetime.now().strftime('%Y-%m-%d %H:%M')
-                }
-                orders.append(order)
-                save_orders(orders)
-                self.switch('home_screen')
-            confirm_btn.bind(on_press=confirm_order)
-            layout.add_widget(confirm_btn)
-
-        layout.add_widget(Label(size_hint_y=None, height=100))
-        scroll.add_widget(layout)
-        self.add_widget(scroll)
-
-class SupplierOrdersScreen(BaseScreen):
-    def on_pre_enter(self):
-        self.clear_widgets()
-        self.add_back_button('home_screen')
-
-        layout = BoxLayout(orientation='vertical', padding=20, spacing=10)
-        layout.add_widget(Label(text=ar('الطلبات الواردة'), font_name='Cairo', font_size=28, bold=True, size_hint_y=None, height=60))
-
-        scroll = ScrollView()
-        grid = GridLayout(cols=1, size_hint_y=None, spacing=10, padding=10)
-        grid.bind(minimum_height=grid.setter('height'))
-
-        my_orders = [o for o in orders if o['supplier'] == current_email and o['status'] == 'قيد الانتظار']
-        if not my_orders:
-            grid.add_widget(Label(text=ar('لا توجد طلبات'), font_name='Cairo', font_size=20))
-        else:
-            for o in my_orders:
-                box = BoxLayout(orientation='vertical', size_hint_y=None, height=120, spacing=5)
-                box.add_widget(Label(
-                    text=ar(f"طلب رقم #{o['id']}\n{o['product']} - {o['price']} نقطة\nالزبون: {o['customer']}\nالدفع: {o['payment_method']}"),
-                    font_name='Cairo',
-                    font_size=18
-                ))
-
-                validate_btn = Button(
-                    text=ar('تأكيد'),
-                    font_name='Cairo',
-                    size_hint_y=None,
-                    height=50,
-                    background_color=(0.0, 0.6, 0.3, 1)
-                )
-                validate_btn.bind(on_press=lambda x, order_id=o['id']: self.validate_order(order_id))
-                box.add_widget(validate_btn)
-                grid.add_widget(box)
-
-        scroll.add_widget(grid)
-        layout.add_widget(scroll)
-        self.add_widget(layout)
-
-    def validate_order(self, order_id):
-        global orders, users
-        for o in orders:
-            if o['id'] == order_id and o['status'] == 'قيد الانتظار':
-                customer_email = o['customer']
-                price = o['price']
-                payment = o['payment_method']
-
-                if payment == 'points':
-                    if users[customer_email]['balance'] >= price:
-                        users[customer_email]['balance'] -= price
-                        users[current_email]['balance'] += price
-                        o['status'] = 'جاهز للتوصيل'
-                        save_users(users)
-                        save_orders(orders)
-                    else:
-                        o['status'] = 'ملغي'
-                        save_orders(orders)
-                else:
-                    o['status'] = 'جاهز للتوصيل'
-                    save_orders(orders)
-                break
-        self.on_pre_enter()
-
-class DriverOrdersScreen(BaseScreen):
-    def on_pre_enter(self):
-        self.clear_widgets()
-        self.add_back_button('home_screen')
-
-        layout = BoxLayout(orientation='vertical', padding=20, spacing=10)
-        layout.add_widget(Label(text=ar('الطلبات الجاهزة'), font_name='Cairo', font_size=28, bold=True, size_hint_y=None, height=60))
-
-        scroll = ScrollView()
-        grid = GridLayout(cols=1, size_hint_y=None)
-        grid.bind(minimum_height=grid.setter('height'))
-
-        available = [o for o in orders if o['status'] == 'جاهز للتوصيل' and o['driver'] is None]
-        if not available:
-            grid.add_widget(Label(text=ar('لا توجد طلبات'), font_name='Cairo', font_size=20))
-        else:
-            for o in available:
-                btn = Button(
-                    text=ar(f"طلب #{o['id']}\n{o['product']} - {o['price']} نقطة\nالتاجر: {o['supplier']}"),
-                    font_name='Cairo',
-                    font_size=18,
-                    size_hint_y=None,
-                    height=90,
-                    background_normal='',
-                    background_color=(0.0, 0.5, 0.8, 1)
-                )
-                btn.bind(on_press=lambda x, order_id=o['id']: self.accept_order(order_id))
-                grid.add_widget(btn)
-
-        scroll.add_widget(grid)
-        layout.add_widget(scroll)
-        self.add_widget(layout)
-
-    def accept_order(self, order_id):
-        for o in orders:
-            if o['id'] == order_id:
-                o['driver'] = current_email
-                o['status'] = 'قيد التوصيل'
-                save_orders(orders)
-                break
-        self.switch('home_screen')
-
-class SettingsScreen(BaseScreen):
-    def on_pre_enter(self):
-        self.clear_widgets()
-        layout = FloatLayout()
-        self.add_back_button('home_screen')
-
-        balance = current_user['balance'] if current_user else 0
-        self.balance_label = Label(
-            text=ar(f'الرصيد: {balance} نقطة'),
-            font_name='Cairo',
-            font_size=26, bold=True,
-            size_hint=(0.85, 0.15),
-            pos_hint={'center_x': 0.5, 'center_y': 0.7}
-        )
-        layout.add_widget(self.balance_label)
-
-        if current_user and current_user['type'] == 'زبون':
-            topup_btn = Button(
-                text=ar('شحن الرصيد'),
-                font_name='Cairo',
-                font_size=24, bold=True,
-                size_hint=(0.85, 0.15),
-                pos_hint={'center_x': 0.5, 'center_y': 0.5},
-                background_normal='', background_color=(0.0, 0.6, 0.4, 1)
-            )
-            topup_btn.bind(on_press=lambda x: self.switch('topup_screen'))
-            layout.add_widget(topup_btn)
-            logout_y = 0.3
-        else:
-            logout_y = 0.5
-
-        logout_btn = Button(
-            text=ar('تسجيل الخروج'),
-            font_name='Cairo',
-            font_size=24, bold=True,
-            size_hint=(0.85, 0.15),
-            pos_hint={'center_x': 0.5, 'center_y': logout_y},
-            background_normal='', background_color=(0.8, 0.2, 0.2, 1)
-        )
-        def logout(x):
-            global current_user, current_email
-            current_user = None
-            current_email = None
-            self.switch('login_screen')
-        logout_btn.bind(on_press=logout)
-        layout.add_widget(logout_btn)
-        self.add_widget(layout)
-
-class TopUpScreen(BaseScreen):
-    def on_pre_enter(self):
-        self.clear_widgets()
-        layout_float = FloatLayout()
-        self.add_back_button('settings_screen')
-        scroll = ScrollView(do_scroll_x=False, size_hint=(1, 0.85), pos_hint={'top': 0.85})
-        layout = BoxLayout(orientation='vertical', size_hint_y=None, padding=35, spacing=25)
-        layout.bind(minimum_height=layout.setter('height'))
-
-        layout.add_widget(Label(text=ar('شحن الرصيد'), font_name='Cairo', size_hint_y=None, height=80, font_size=30, bold=True))
-        layout.add_widget(Label(text=ar('CCP: 1234 5678 99 00'), font_name='Cairo', font_size=22, size_hint_y=None, height=60))
-        layout.add_widget(Label(text=ar('1 نقطة = 10 دج'), font_name='Cairo', font_size=22, size_hint_y=None, height=60))
-
-        self.amount = TextInput(
-            hint_text=ar('المبلغ بالدينار'),
-            font_name='Cairo',
-            multiline=False, input_filter='int',
-            font_size=24, padding=[20, 25],
-            background_color=(1, 1, 1, 1),
-            size_hint_y=None, height=100
-        )
-        layout.add_widget(self.amount)
-
-        btn = Button(
-            text=ar('طلب الشحن'),
-            font_name='Cairo',
-            font_size=24, bold=True,
-            size_hint_y=None, height=90,
-            background_normal='', background_color=(0.0, 0.6, 0.4, 1)
-        )
-        btn.bind(on_press=self.request_topup)
-        layout.add_widget(btn)
-
-        scroll.add_widget(layout)
-        layout_float.add_widget(scroll)
-        self.add_widget(layout_float)
-
-    def request_topup(self, x):
-        try:
-            amount = int(self.amount.text)
-            if current_user and amount >= 10:
-                current_user['balance'] += amount // 10
-                users[current_email] = current_user
-                save_users(users)
-                self.amount.text = ''
-                self.switch('settings_screen')
-        except:
-            self.amount.hint_text = ar('قيمة خاطئة')
-
-class MainApp(App):
+class NeshrblekApp(App):
     def build(self):
-        self.title = ar('نشريلك')
-        sm = ScreenManager()
-        sm.add_widget(LoginScreen(name='login_screen'))
-        sm.add_widget(HomeScreen(name='home_screen'))
-        sm.add_widget(ProductsScreen(name='products_screen'))
-        sm.add_widget(AddProductScreen(name='add_product_screen'))
-        sm.add_widget(SearchProductScreen(name='search_product_screen'))
-        sm.add_widget(ConfirmOrderScreen(name='confirm_order_screen'))
-        sm.add_widget(SupplierOrdersScreen(name='supplier_orders_screen'))
-        sm.add_widget(DriverOrdersScreen(name='driver_orders_screen'))
-        sm.add_widget(SettingsScreen(name='settings_screen'))
-        sm.add_widget(TopUpScreen(name='topup_screen'))
-        sm.current = 'login_screen'
-        return sm
+        self.title = ar('نشربلك')
+        return Builder.load_string(KV)
 
 if __name__ == '__main__':
-    MainApp().run()
+    NeshrblekApp().run()
