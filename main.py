@@ -18,22 +18,25 @@ from kivy.uix.scrollview import ScrollView
 from kivy.uix.gridlayout import GridLayout
 from kivy.uix.popup import Popup
 from kivy.uix.spinner import Spinner
+from kivy.uix.modalview import ModalView
 from kivy.core.text import LabelBase
 from kivy.utils import get_color_from_hex
 from kivy.graphics import Color, RoundedRectangle
+from kivy.metrics import dp
 
 # Firebase Config (Placeholders)
+# Replace these with your actual Firebase project credentials
 firebase_config = {
     "apiKey": "YOUR_API_KEY",
     "authDomain": "YOUR_AUTH_DOMAIN",
-    "databaseURL": "YOUR_DATABASE_URL",
+    "databaseURL": "YOUR_DATABASE_URL", # Must be https://project-id.firebaseio.com
     "projectId": "YOUR_PROJECT_ID",
     "storageBucket": "YOUR_STORAGE_BUCKET",
     "messagingSenderId": "YOUR_MESSAGING_SENDER_ID",
     "appId": "YOUR_APP_ID"
 }
 
-# Initialize Firebase
+# Initialize Firebase Realtime Database
 try:
     firebase = pyrebase.initialize_app(firebase_config)
     db = firebase.database()
@@ -72,6 +75,14 @@ COLORS = {
 current_user = None
 cart = []
 
+class LoadingView(ModalView):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.size_hint = (0.6, 0.25)
+        self.auto_dismiss = False
+        self.background_color = (0, 0, 0, 0.8)
+        self.add_widget(Label(text=ar("جاري التحميل... (Loading)"), font_name='Cairo', font_size=20))
+
 KV = f'''
 ScreenManager:
     LoginScreen:
@@ -91,7 +102,7 @@ ScreenManager:
     font_name: 'Cairo'
     font_size: 18
     size_hint_y: None
-    height: 50
+    height: dp(50)
     background_color: 0,0,0,0
     canvas.before:
         Color:
@@ -378,6 +389,12 @@ ScreenManager:
                 font_size: 20
                 bold: True
 
+            CustomButton:
+                text: "{ar('تحديث')}"
+                size_hint_x: 0.2
+                bg_color: (0.1, 0.5, 0.1, 1)
+                on_release: root.load_products()
+
         ScrollView:
             id: scroll
             GridLayout:
@@ -393,7 +410,7 @@ ScreenManager:
     BoxLayout:
         orientation: 'vertical'
         padding: 20
-        spacing: 15
+        spacing: 10
         canvas.before:
             Color:
                 rgba: 0.1, 0.1, 0.18, 1
@@ -429,7 +446,7 @@ ScreenManager:
             hint_text_font_name: 'Cairo'
             multiline: False
             size_hint_y: None
-            height: 50
+            height: dp(50)
             background_color: 0.15,0.15,0.25,1
             foreground_color: 1,1,1,1
             padding: 15
@@ -442,7 +459,20 @@ ScreenManager:
             input_type: 'number'
             multiline: False
             size_hint_y: None
-            height: 50
+            height: dp(50)
+            background_color: 0.15,0.15,0.25,1
+            foreground_color: 1,1,1,1
+            padding: 15
+
+        TextInput:
+            id: quantity
+            hint_text: "{ar('الكمية (Quantity)')}"
+            font_name: 'Cairo'
+            hint_text_font_name: 'Cairo'
+            input_filter: 'int'
+            multiline: False
+            size_hint_y: None
+            height: dp(60)
             background_color: 0.15,0.15,0.25,1
             foreground_color: 1,1,1,1
             padding: 15
@@ -453,15 +483,23 @@ ScreenManager:
             font_name: 'Cairo'
             hint_text_font_name: 'Cairo'
             size_hint_y: None
-            height: 100
+            height: dp(80)
             background_color: 0.15,0.15,0.25,1
             foreground_color: 1,1,1,1
             padding: 15
 
-        CustomButton:
-            text: "{ar('حفظ المنتج')}"
-            bg_color: (0.1, 0.6, 0.9, 1)
-            on_release: root.add_product()
+        BoxLayout:
+            size_hint_y: None
+            height: dp(60)
+            spacing: 10
+            CustomButton:
+                text: "{ar('حفظ المنتج')}"
+                bg_color: (0.1, 0.6, 0.9, 1)
+                on_release: root.add_product()
+            CustomButton:
+                text: "{ar('مسح الحقول')}"
+                bg_color: (0.4, 0.4, 0.4, 1)
+                on_release: root.clear_fields()
 
 <CartScreen>:
     name: 'cart'
@@ -669,9 +707,9 @@ class LoginScreen(BaseScreen):
             self.show_popup('خطأ', 'لا يوجد اتصال بالإنترنت')
             return
 
+        loading = LoadingView()
+        loading.open()
         try:
-            # Simple simulation of users collection since we don't have Auth here
-            # Email is used as safe key by replacing '.'
             user_key = email.replace('.', ',')
             user_data = db.child("users").child(user_key).get().val()
 
@@ -707,6 +745,8 @@ class LoginScreen(BaseScreen):
                 self.show_popup('خطأ', 'البريد أو كلمة السر غير صحيحة')
         except Exception as e:
             self.show_popup('خطأ', f'فشل الاتصال: {str(e)}')
+        finally:
+            loading.dismiss()
 
 class RegisterScreen(BaseScreen):
     def register(self):
@@ -731,6 +771,8 @@ class RegisterScreen(BaseScreen):
                 logical_type = v
                 break
 
+        loading = LoadingView()
+        loading.open()
         try:
             user_key = email.replace('.', ',')
             if db.child("users").child(user_key).get().val():
@@ -742,12 +784,15 @@ class RegisterScreen(BaseScreen):
                 'password': password,
                 'phone': phone,
                 'type': logical_type,
-                'balance': 0
+                'balance': 0,
+                'created_at': {".sv": "timestamp"}
             })
             self.show_popup('نجاح', 'تم إنشاء الحساب بنجاح')
             self.manager.current = 'login'
         except Exception as e:
             self.show_popup('خطأ', f'فشل التسجيل: {str(e)}')
+        finally:
+            loading.dismiss()
 
 class HomeScreen(BaseScreen):
     def logout(self):
@@ -768,13 +813,14 @@ class ProductsScreen(BaseScreen):
             grid.add_widget(Label(text=ar('لا يوجد اتصال'), font_name='Cairo'))
             return
 
+        loading = LoadingView()
+        loading.open()
         try:
             products_data = db.child("products").get().val()
             if not products_data:
-                grid.add_widget(Label(text=ar('لا توجد منتجات'), font_name='Cairo', size_hint_y=None, height=50))
+                grid.add_widget(Label(text=ar('لا توجد منتجات حتى الآن، أضف منتجك الأول'), font_name='Cairo', size_hint_y=None, height=50))
                 return
 
-            # Firebase returns a dict or list depending on structure
             products_list = products_data.values() if isinstance(products_data, dict) else products_data
 
             for p in products_list:
@@ -798,12 +844,20 @@ class ProductsScreen(BaseScreen):
                 grid.add_widget(box)
         except Exception as e:
             grid.add_widget(Label(text=ar(f'خطأ في التحميل: {str(e)}'), font_name='Cairo'))
+        finally:
+            loading.dismiss()
 
     def add_to_cart(self, product):
         cart.append(product)
         self.show_popup('تم', f"تم إضافة {product['name']} للسلة")
 
 class AddProductScreen(BaseScreen):
+    def clear_fields(self):
+        self.ids.name.text = ''
+        self.ids.price.text = ''
+        self.ids.quantity.text = ''
+        self.ids.desc.text = ''
+
     def add_product(self):
         if not db:
             self.show_popup('خطأ', 'لا يوجد اتصال بالإنترنت')
@@ -814,26 +868,42 @@ class AddProductScreen(BaseScreen):
             return
 
         name = self.ids.name.text.strip()
-        price = self.ids.price.text.strip()
+        price_str = self.ids.price.text.strip()
+        quantity_str = self.ids.quantity.text.strip()
         desc = self.ids.desc.text.strip()
 
-        if not all([name, price]):
-            self.show_popup('خطأ', 'املأ اسم وسعر المنتج')
+        if not name or not price_str or not quantity_str:
+            self.show_popup('خطأ', 'املأ جميع الحقول المطلوبة')
             return
 
         try:
+            price = int(price_str)
+            quantity = int(quantity_str)
+        except ValueError:
+            self.show_popup('خطأ', 'أدخل أرقاماً صالحة (Enter valid number)')
+            return
+
+        if quantity <= 0:
+            self.show_popup('خطأ', 'الكمية يجب أن تكون أكبر من 0')
+            return
+
+        loading = LoadingView()
+        loading.open()
+        try:
             db.child("products").push({
                 'name': name,
-                'price': int(price),
+                'price': price,
+                'quantity': quantity,
                 'desc': desc,
-                'supplier': current_user['email']
+                'supplier': current_user['email'],
+                'created_at': {".sv": "timestamp"}
             })
-            self.show_popup('نجاح', 'تم إضافة المنتج')
-            self.ids.name.text = ''
-            self.ids.price.text = ''
-            self.ids.desc.text = ''
+            self.show_popup('نجاح', 'تم إضافة المنتج بنجاح')
+            self.clear_fields()
         except Exception as e:
             self.show_popup('خطأ', f'فشل الإضافة: {str(e)}')
+        finally:
+            loading.dismiss()
 
 class CartScreen(BaseScreen):
     def on_pre_enter(self):
@@ -871,19 +941,24 @@ class CartScreen(BaseScreen):
             self.show_popup('خطأ', 'السلة فارغة')
             return
 
+        loading = LoadingView()
+        loading.open()
         try:
             db.child("orders").push({
                 'customer': current_user['email'],
                 'products': cart.copy(),
                 'total': sum(p['price'] for p in cart),
                 'status': 'قيد المعالجة',
-                'date': datetime.now().strftime('%Y-%m-%d %H:%M')
+                'date': datetime.now().strftime('%Y-%m-%d %H:%M'),
+                'created_at': {".sv": "timestamp"}
             })
             cart.clear()
             self.show_popup('نجاح', 'تم تأكيد الطلب بنجاح')
             self.manager.current = 'home'
         except Exception as e:
             self.show_popup('خطأ', f'فشل تأكيد الطلب: {str(e)}')
+        finally:
+            loading.dismiss()
 
 class OrdersScreen(BaseScreen):
     def on_pre_enter(self):
@@ -897,6 +972,8 @@ class OrdersScreen(BaseScreen):
             grid.add_widget(Label(text=ar('لا يوجد اتصال'), font_name='Cairo'))
             return
 
+        loading = LoadingView()
+        loading.open()
         try:
             all_orders = db.child("orders").get().val()
             if not all_orders:
@@ -924,6 +1001,8 @@ class OrdersScreen(BaseScreen):
                 grid.add_widget(box)
         except Exception as e:
             grid.add_widget(Label(text=ar(f'خطأ: {str(e)}'), font_name='Cairo'))
+        finally:
+            loading.dismiss()
 
 class ProfileScreen(BaseScreen):
     pass
