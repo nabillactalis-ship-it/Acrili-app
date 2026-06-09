@@ -1,3 +1,11 @@
+import json
+import os
+import re
+from datetime import datetime
+
+import arabic_reshaper
+from bidi.algorithm import get_display
+
 from kivy.app import App
 from kivy.lang import Builder
 from kivy.uix.screenmanager import ScreenManager, Screen
@@ -7,15 +15,11 @@ from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.textinput import TextInput
 from kivy.uix.scrollview import ScrollView
 from kivy.uix.gridlayout import GridLayout
+from kivy.uix.popup import Popup
+from kivy.uix.spinner import Spinner
 from kivy.core.text import LabelBase
 from kivy.utils import get_color_from_hex
 from kivy.graphics import Color, RoundedRectangle
-from kivy.properties import ListProperty
-import json
-import os
-from datetime import datetime
-import arabic_reshaper
-from bidi.algorithm import get_display
 
 # تسجيل خط عربي
 font_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'Cairo-Regular.ttf')
@@ -26,9 +30,13 @@ def ar(text):
     if not text:
         return ""
     try:
-        # Reshape and apply Bidi algorithm
         reshaped = arabic_reshaper.reshape(str(text))
-        return get_display(reshaped)
+        bidi_text = get_display(reshaped)
+        # إزالة رموز التحكم Bidi التي قد تسبب مربعات في Kivy
+        bidi_text = re.sub(r'[\u200e\u200f\u202a-\u202e]', '', bidi_text)
+        # توحيد المسافات لتجنب مشاكل العرض
+        bidi_text = bidi_text.replace('\u00a0', ' ')
+        return bidi_text
     except Exception:
         return str(text)
 
@@ -221,6 +229,7 @@ ScreenManager:
             password: True
             font_name: 'Cairo'
             hint_text_font_name: 'Cairo'
+            font_size: 18
             multiline: False
             size_hint_y: None
             height: 50
@@ -576,7 +585,6 @@ ScreenManager:
         BoxLayout:
             size_hint_y: None
             height: 60
-            padding: 10
             canvas.before:
                 Color:
                     rgba: 0.15,0.15,0.25,1
@@ -647,9 +655,11 @@ ScreenManager:
 
 class BaseScreen(Screen):
     def show_popup(self, title, msg):
-        from kivy.uix.popup import Popup
-        popup = Popup(title=ar(title), content=Label(text=ar(msg), font_name='Cairo'),
-                     size_hint=(0.8, 0.4))
+        popup = Popup(
+            title=ar(title),
+            content=Label(text=ar(msg), font_name='Cairo'),
+            size_hint=(0.8, 0.4)
+        )
         popup.open()
 
 class LoginScreen(BaseScreen):
@@ -703,7 +713,7 @@ class RegisterScreen(BaseScreen):
             self.show_popup('خطأ', 'املأ جميع الحقول')
             return
 
-        # Correctly map display types to logical types
+        # Map display types to logical types
         types_map = {'زبون': 'customer', 'تاجر': 'supplier', 'سائق': 'driver'}
         logical_type = 'customer'
         for k, v in types_map.items():
@@ -752,13 +762,12 @@ class ProductsScreen(BaseScreen):
         for p in products:
             box = BoxLayout(orientation='vertical', size_hint_y=None, height=120, padding=10)
 
-            # Closure fix for dynamic background
             with box.canvas.before:
                 Color(rgba=COLORS['card'])
                 rect = RoundedRectangle(pos=box.pos, size=box.size, radius=[15])
 
-            box.bind(pos=lambda inst, pos, r=rect: setattr(r, 'pos', pos),
-                     size=lambda inst, size, r=rect: setattr(r, 'size', size))
+            box.bind(pos=lambda inst, pos, r=rect: setattr(r, 'pos', pos))
+            box.bind(size=lambda inst, size, r=rect: setattr(r, 'size', size))
 
             box.add_widget(Label(text=ar(p['name']), font_name='Cairo', font_size=18, bold=True, size_hint_y=0.4))
             box.add_widget(Label(text=ar(p.get('desc', '')), font_name='Cairo', font_size=14, color=(0.7,0.7,0.7,1), size_hint_y=0.3))
@@ -871,8 +880,8 @@ class OrdersScreen(BaseScreen):
                 Color(rgba=COLORS['card'])
                 rect = RoundedRectangle(pos=box.pos, size=box.size, radius=[15])
 
-            box.bind(pos=lambda inst, pos, r=rect: setattr(r, 'pos', pos),
-                     size=lambda inst, size, r=rect: setattr(r, 'size', size))
+            box.bind(pos=lambda inst, pos, r=rect: setattr(r, 'pos', pos))
+            box.bind(size=lambda inst, size, r=rect: setattr(r, 'size', size))
 
             box.add_widget(Label(text=ar(f"طلب رقم {o['id']} - {o['date']}"), font_name='Cairo', bold=True, size_hint_y=0.3))
             box.add_widget(Label(text=ar(f"عدد المنتجات: {len(o['products'])}"), font_name='Cairo', size_hint_y=0.3))
