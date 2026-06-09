@@ -12,6 +12,7 @@ from kivy.core.window import Window
 from kivy.core.text import LabelBase
 import json
 import os
+import hashlib
 from datetime import datetime
 import arabic_reshaper
 from bidi.algorithm import get_display
@@ -22,7 +23,10 @@ Window.softinput_mode = 'resize'
 
 # سجل الخط العربي - لازم ملف Cairo-Regular.ttf يكون حدا الكود
 font_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'Cairo-Regular.ttf')
-LabelBase.register(name='Cairo', fn_regular=font_path)
+LabelBase.register(name='NotoArabic', fn_regular=font_path)
+
+def hash_password(password):
+    return hashlib.sha256(password.encode()).hexdigest()
 
 def ar(text):
     """دالة تعالج العربية باش تتلصق وتترتب من اليمين"""
@@ -81,7 +85,7 @@ class BaseScreen(Screen):
     def add_back_button(self, target='home_screen'):
         back_btn = Button(
             text=ar('< رجوع'),
-            font_name='Cairo',
+            font_name='NotoArabic',
             font_size=18,
             size_hint=(0.25, 0.09),
             pos_hint={'x': 0.02, 'top': 0.98},
@@ -108,7 +112,7 @@ class LoginScreen(BaseScreen):
 
         scroll_content.add_widget(Label(
             text=ar('نشريلك'),
-            font_name='Cairo',
+            font_name='NotoArabic',
             font_size=40,
             bold=True,
             size_hint=(0.9, 0.12),
@@ -118,7 +122,7 @@ class LoginScreen(BaseScreen):
         self.type_spinner = Spinner(
             text=ar('زبون'),
             values=[ar('زبون'), ar('تاجر'), ar('سائق')],
-            font_name='Cairo',
+            font_name='NotoArabic',
             font_size=22,
             background_normal='',
             background_color=(0.15, 0.15, 0.15, 1),
@@ -129,7 +133,7 @@ class LoginScreen(BaseScreen):
 
         self.email_input = TextInput(
             hint_text=ar('البريد الإلكتروني'),
-            font_name='Cairo',
+            font_name='NotoArabic',
             multiline=False,
             font_size=24,
             padding=[20, 25],
@@ -141,7 +145,7 @@ class LoginScreen(BaseScreen):
 
         self.password_input = TextInput(
             hint_text=ar('كلمة المرور'),
-            font_name='Cairo',
+            font_name='NotoArabic',
             password=True,
             multiline=False,
             font_size=24,
@@ -161,7 +165,7 @@ class LoginScreen(BaseScreen):
 
         login_btn = Button(
             text=ar('دخول'),
-            font_name='Cairo',
+            font_name='NotoArabic',
             font_size=24,
             bold=True,
             size_hint=(0.9, 0.15),
@@ -171,10 +175,23 @@ class LoginScreen(BaseScreen):
         )
         login_btn.bind(on_press=self.login)
         scroll_content.add_widget(login_btn)
+        register_nav_btn = Button(
+            text=ar('إنشاء حساب جديد'),
+            font_name='NotoArabic',
+            font_size=18,
+            size_hint=(0.9, 0.1),
+            pos_hint={'center_x': 0.5, 'y': 0.25},
+            background_normal='',
+            background_color=(0.3, 0.3, 0.3, 1)
+        )
+        register_nav_btn.bind(on_press=lambda x: self.switch('register_screen'))
+        scroll_content.add_widget(register_nav_btn)
+
 
         scroll.add_widget(scroll_content)
         self.layout.add_widget(scroll)
         self.add_widget(self.layout)
+
 
     def login(self, instance):
         global current_user, current_email
@@ -183,17 +200,125 @@ class LoginScreen(BaseScreen):
         if not email or not password:
             self.email_input.hint_text = ar('املأ الكل')
             return
+
+        hashed_pw = hash_password(password)
         if email not in users:
+            # Check if we should allow auto-registration on login (existing behavior)
+            # but ensure we hash the password
             balance = 100 if user_type == 'زبون' else 0
-            users[email] = {'password': password, 'balance': balance, 'type': user_type}
+            users[email] = {'password': hashed_pw, 'balance': balance, 'type': user_type}
             save_users(users)
-        elif users[email]['password']!= password:
-            self.password_input.text = ''
-            self.password_input.hint_text = ar('خطأ')
-            return
+        elif users[email]['password'] != hashed_pw:
+            # Compatibility check: if old plain text password matches, upgrade it
+            if users[email]['password'] == password:
+                users[email]['password'] = hashed_pw
+                save_users(users)
+            else:
+                self.password_input.text = ''
+                self.password_input.hint_text = ar('خطأ')
+                return
+
         current_user = users[email]
         current_email = email
         self.manager.current = 'home_screen'
+
+
+
+class RegisterScreen(BaseScreen):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.layout = FloatLayout()
+        scroll = ScrollView(do_scroll_x=False)
+        scroll_content = FloatLayout(size_hint_y=None, height=800)
+
+        scroll_content.add_widget(Label(
+            text=ar('تسجيل حساب جديد'),
+            font_name='NotoArabic',
+            font_size=30,
+            bold=True,
+            size_hint=(0.9, 0.12),
+            pos_hint={'center_x': 0.5, 'top': 0.95}
+        ))
+
+        self.type_spinner = Spinner(
+            text=ar('زبون'),
+            values=[ar('زبون'), ar('تاجر'), ar('سائق')],
+            font_name='NotoArabic',
+            font_size=22,
+            background_normal='',
+            background_color=(0.15, 0.15, 0.15, 1),
+            size_hint=(0.9, 0.13),
+            pos_hint={'center_x': 0.5, 'top': 0.8}
+        )
+        scroll_content.add_widget(self.type_spinner)
+
+        self.email_input = TextInput(
+            hint_text=ar('البريد الإلكتروني'),
+            font_name='NotoArabic',
+            multiline=False,
+            font_size=24,
+            padding=[20, 25],
+            background_color=(1, 1, 1, 1),
+            size_hint=(0.9, 0.15),
+            pos_hint={'center_x': 0.5, 'top': 0.63}
+        )
+        scroll_content.add_widget(self.email_input)
+
+        self.password_input = TextInput(
+            hint_text=ar('كلمة المرور'),
+            font_name='NotoArabic',
+            password=True,
+            multiline=False,
+            font_size=24,
+            padding=[20, 25],
+            background_color=(1, 1, 1, 1),
+            size_hint=(0.9, 0.15),
+            pos_hint={'center_x': 0.5, 'top': 0.44}
+        )
+        scroll_content.add_widget(self.password_input)
+
+        register_btn = Button(
+            text=ar('تسجيل'),
+            font_name='NotoArabic',
+            font_size=24,
+            bold=True,
+            size_hint=(0.9, 0.15),
+            pos_hint={'center_x': 0.5, 'y': 0.08},
+            background_normal='',
+            background_color=(0.0, 0.6, 0.3, 1)
+        )
+        register_btn.bind(on_press=self.register_user)
+        scroll_content.add_widget(register_btn)
+
+        scroll.add_widget(scroll_content)
+        self.layout.add_widget(scroll)
+        self.add_widget(self.layout)
+        self.add_back_button('login_screen')
+
+
+    def register_user(self, instance):
+        global users
+        email = self.email_input.text.strip()
+        password = self.password_input.text.strip()
+        display_type = self.type_spinner.text
+        if not email or not password:
+            self.email_input.hint_text = ar('املأ الكل')
+            return
+        if email in users:
+            self.email_input.text = ''
+            self.email_input.hint_text = ar('المستخدم موجود')
+            return
+
+        # Map Arabic display back to logical type
+        u_type = 'زبون'
+        if display_type == ar('تاجر'): u_type = 'تاجر'
+        elif display_type == ar('سائق'): u_type = 'سائق'
+
+        balance = 100 if u_type == 'زبون' else 0
+        users[email] = {'password': hash_password(password), 'balance': balance, 'type': u_type}
+        save_users(users)
+        self.manager.current = 'login_screen'
+
 
 class HomeScreen(BaseScreen):
     def on_pre_enter(self):
@@ -203,7 +328,7 @@ class HomeScreen(BaseScreen):
 
         btn1 = Button(
             text=ar('المنتجات'),
-            font_name='Cairo',
+            font_name='NotoArabic',
             font_size=24, bold=True,
             size_hint=(0.85, 0.15),
             pos_hint={'center_x': 0.5, 'top': 0.85},
@@ -215,7 +340,7 @@ class HomeScreen(BaseScreen):
         if current_user and current_user['type'] == 'تاجر':
             btn_orders = Button(
                 text=ar('الطلبات'),
-                font_name='Cairo',
+                font_name='NotoArabic',
                 font_size=24, bold=True,
                 size_hint=(0.85, 0.15),
                 pos_hint={'center_x': 0.5, 'center_y': 0.65},
@@ -226,7 +351,7 @@ class HomeScreen(BaseScreen):
 
             btn_add = Button(
                 text=ar('أضف منتج'),
-                font_name='Cairo',
+                font_name='NotoArabic',
                 font_size=24, bold=True,
                 size_hint=(0.85, 0.15),
                 pos_hint={'center_x': 0.5, 'center_y': 0.45},
@@ -238,7 +363,7 @@ class HomeScreen(BaseScreen):
         elif current_user and current_user['type'] == 'سائق':
             btn_orders = Button(
                 text=ar('الطلبات'),
-                font_name='Cairo',
+                font_name='NotoArabic',
                 font_size=24, bold=True,
                 size_hint=(0.85, 0.15),
                 pos_hint={'center_x': 0.5, 'center_y': 0.65},
@@ -252,7 +377,7 @@ class HomeScreen(BaseScreen):
 
         btn2 = Button(
             text=ar('الإعدادات'),
-            font_name='Cairo',
+            font_name='NotoArabic',
             font_size=24, bold=True,
             size_hint=(0.85, 0.15),
             pos_hint={'center_x': 0.5, 'center_y': settings_y},
@@ -271,7 +396,7 @@ class ProductsScreen(BaseScreen):
         if current_user and current_user['type'] == 'زبون':
             add_order_btn = Button(
                 text=ar('أضف طلب'),
-                font_name='Cairo',
+                font_name='NotoArabic',
                 font_size=22, bold=True,
                 size_hint=(0.9, 0.1),
                 pos_hint={'center_x': 0.5, 'top': 0.88},
@@ -290,7 +415,7 @@ class ProductsScreen(BaseScreen):
         for p in products:
             grid.add_widget(Label(
                 text=ar(f"{p['name']} - {p['price']} نقطة"),
-                font_name='Cairo',
+                font_name='NotoArabic',
                 font_size=22, size_hint_y=None, height=70
             ))
         scroll.add_widget(grid)
@@ -307,31 +432,31 @@ class AddProductScreen(BaseScreen):
         layout = BoxLayout(orientation='vertical', padding=40, spacing=20, size_hint_y=None)
         layout.bind(minimum_height=layout.setter('height'))
 
-        layout.add_widget(Label(text=ar('إضافة منتج'), font_name='Cairo', font_size=30, bold=True, size_hint_y=None, height=70))
+        layout.add_widget(Label(text=ar('إضافة منتج'), font_name='NotoArabic', font_size=30, bold=True, size_hint_y=None, height=70))
 
-        self.name_input = TextInput(hint_text=ar('اسم المنتج'), font_name='Cairo', font_size=22, padding=[20, 25], background_color=(1, 1, 1, 1), size_hint_y=None, height=85)
+        self.name_input = TextInput(hint_text=ar('اسم المنتج'), font_name='NotoArabic', font_size=22, padding=[20, 25], background_color=(1, 1, 1, 1), size_hint_y=None, height=85)
         layout.add_widget(self.name_input)
 
-        self.price_input = TextInput(hint_text=ar('السعر بالنقاط'), font_name='Cairo', input_filter='int', font_size=22, padding=[20, 25], background_color=(1, 1, 1, 1), size_hint_y=None, height=85)
+        self.price_input = TextInput(hint_text=ar('السعر بالنقاط'), font_name='NotoArabic', input_filter='int', font_size=22, padding=[20, 25], background_color=(1, 1, 1, 1), size_hint_y=None, height=85)
         layout.add_widget(self.price_input)
 
-        layout.add_widget(Label(text=ar('طرق الدفع'), font_name='Cairo', font_size=22, bold=True, size_hint_y=None, height=50))
-        self.pay_points = Button(text=ar('[ ] نقاط'), font_name='Cairo', font_size=20, size_hint_y=None, height=70, background_color=(0.3,0.3,0.3,1))
-        self.pay_ccp = Button(text=ar('[ ] CCP'), font_name='Cairo', font_size=20, size_hint_y=None, height=70, background_color=(0.3,0.3,0.3,1))
-        self.pay_cash = Button(text=ar('[ ] كاش'), font_name='Cairo', font_size=20, size_hint_y=None, height=70, background_color=(0.3,0.3,0.3,1))
+        layout.add_widget(Label(text=ar('طرق الدفع'), font_name='NotoArabic', font_size=22, bold=True, size_hint_y=None, height=50))
+        self.pay_points = Button(text=ar('[ ] نقاط'), font_name='NotoArabic', font_size=20, size_hint_y=None, height=70, background_color=(0.3,0.3,0.3,1))
+        self.pay_ccp = Button(text=ar('[ ] CCP'), font_name='NotoArabic', font_size=20, size_hint_y=None, height=70, background_color=(0.3,0.3,0.3,1))
+        self.pay_cash = Button(text=ar('[ ] كاش'), font_name='NotoArabic', font_size=20, size_hint_y=None, height=70, background_color=(0.3,0.3,0.3,1))
 
-        self.pay_points.bind(on_press=lambda x: self.toggle_btn(self.pay_points))
-        self.pay_ccp.bind(on_press=lambda x: self.toggle_btn(self.pay_ccp))
-        self.pay_cash.bind(on_press=lambda x: self.toggle_btn(self.pay_cash))
+        self.pay_points.bind(on_press=lambda x: self.toggle_btn(self.pay_points, 'نقاط'))
+        self.pay_ccp.bind(on_press=lambda x: self.toggle_btn(self.pay_ccp, 'CCP'))
+        self.pay_cash.bind(on_press=lambda x: self.toggle_btn(self.pay_cash, 'كاش'))
 
         layout.add_widget(self.pay_points)
         layout.add_widget(self.pay_ccp)
         layout.add_widget(self.pay_cash)
 
-        self.ccp_input = TextInput(hint_text=ar('رقم CCP'), font_name='Cairo', font_size=22, padding=[20, 25], background_color=(1, 1, 1, 1), size_hint_y=None, height=85)
+        self.ccp_input = TextInput(hint_text=ar('رقم CCP'), font_name='NotoArabic', font_size=22, padding=[20, 25], background_color=(1, 1, 1, 1), size_hint_y=None, height=85)
         layout.add_widget(self.ccp_input)
 
-        add_btn = Button(text=ar('إضافة'), font_name='Cairo', font_size=24, bold=True, size_hint_y=None, height=85, background_normal='', background_color=(0.0, 0.6, 0.4, 1))
+        add_btn = Button(text=ar('إضافة'), font_name='NotoArabic', font_size=24, bold=True, size_hint_y=None, height=85, background_normal='', background_color=(0.0, 0.6, 0.4, 1))
         add_btn.bind(on_press=self.add_product)
         layout.add_widget(add_btn)
 
@@ -340,15 +465,14 @@ class AddProductScreen(BaseScreen):
         layout_float.add_widget(scroll)
         self.add_widget(layout_float)
 
-    def toggle_btn(self, btn):
-        if '[ ]' in get_display(arabic_reshaper.reshape(btn.text)): # Check logically if possible, but let's be simpler
-            pass
-        # Better toggle check
-        if 'x' in btn.text:
-             btn.text = btn.text.replace('x', ' ')
+    def toggle_btn(self, btn, label):
+        if getattr(btn, 'active', False):
+             btn.active = False
+             btn.text = ar(f'[ ] {label}')
              btn.background_color = (0.3, 0.3, 0.3, 1)
         else:
-             btn.text = btn.text.replace(' ', 'x')
+             btn.active = True
+             btn.text = ar(f'[x] {label}')
              btn.background_color = (0.0, 0.6, 0.4, 1)
 
     def add_product(self, x):
@@ -356,9 +480,9 @@ class AddProductScreen(BaseScreen):
         try:
             price = int(self.price_input.text)
             methods = []
-            if 'x' in self.pay_points.text: methods.append('points')
-            if 'x' in self.pay_ccp.text: methods.append('ccp')
-            if 'x' in self.pay_cash.text: methods.append('cash')
+            if getattr(self.pay_points, 'active', False): methods.append('points')
+            if getattr(self.pay_ccp, 'active', False): methods.append('ccp')
+            if getattr(self.pay_cash, 'active', False): methods.append('cash')
 
             if name and price > 0 and methods and current_email:
                 products.append({
@@ -379,7 +503,7 @@ class SearchProductScreen(BaseScreen):
         self.add_back_button('products_screen')
 
         layout = BoxLayout(orientation='vertical', padding=30, spacing=15)
-        layout.add_widget(Label(text=ar('اختر المنتج'), font_name='Cairo', font_size=28, bold=True, size_hint_y=None, height=60))
+        layout.add_widget(Label(text=ar('اختر المنتج'), font_name='NotoArabic', font_size=28, bold=True, size_hint_y=None, height=60))
 
         scroll = ScrollView()
         grid = GridLayout(cols=1, size_hint_y=None, spacing=10, padding=10)
@@ -388,7 +512,7 @@ class SearchProductScreen(BaseScreen):
         for idx, p in enumerate(products):
             btn = Button(
                 text=ar(f"{p['name']} - {p['price']} نقطة"),
-                font_name='Cairo',
+                font_name='NotoArabic',
                 font_size=20,
                 size_hint_y=None,
                 height=70,
@@ -417,11 +541,11 @@ class ConfirmOrderScreen(BaseScreen):
         layout.bind(minimum_height=layout.setter('height'))
 
         if selected_product:
-            layout.add_widget(Label(text=ar(f"المنتج: {selected_product['name']}"), font_name='Cairo', font_size=26, bold=True, size_hint_y=None, height=60))
-            layout.add_widget(Label(text=ar(f"السعر: {selected_product['price']} نقطة"), font_name='Cairo', font_size=24, size_hint_y=None, height=50))
-            layout.add_widget(Label(text=ar(f"رصيدك: {current_user['balance']} نقطة"), font_name='Cairo', font_size=22, size_hint_y=None, height=50))
+            layout.add_widget(Label(text=ar(f"المنتج: {selected_product['name']}"), font_name='NotoArabic', font_size=26, bold=True, size_hint_y=None, height=60))
+            layout.add_widget(Label(text=ar(f"السعر: {selected_product['price']} نقطة"), font_name='NotoArabic', font_size=24, size_hint_y=None, height=50))
+            layout.add_widget(Label(text=ar(f"رصيدك: {current_user['balance']} نقطة"), font_name='NotoArabic', font_size=22, size_hint_y=None, height=50))
 
-            layout.add_widget(Label(text=ar('طريقة الدفع'), font_name='Cairo', font_size=22, bold=True, size_hint_y=None, height=50))
+            layout.add_widget(Label(text=ar('طريقة الدفع'), font_name='NotoArabic', font_size=22, bold=True, size_hint_y=None, height=50))
 
             vals = []
             display_to_logical = {}
@@ -436,7 +560,7 @@ class ConfirmOrderScreen(BaseScreen):
             self.pay_choice = Spinner(
                 text=vals[0] if vals else "",
                 values=vals,
-                font_name='Cairo',
+                font_name='NotoArabic',
                 font_size=22,
                 size_hint_y=None,
                 height=80,
@@ -445,9 +569,9 @@ class ConfirmOrderScreen(BaseScreen):
             layout.add_widget(self.pay_choice)
 
             if 'ccp' in selected_product['payment_methods']:
-                layout.add_widget(Label(text=ar(f"رقم CCP: {selected_product.get('ccp_number', 'لا يوجد')}"), font_name='Cairo', font_size=18, color=(1,0,0,1), size_hint_y=None, height=40))
+                layout.add_widget(Label(text=ar(f"رقم CCP: {selected_product.get('ccp_number', 'لا يوجد')}"), font_name='NotoArabic', font_size=18, color=(1,0,0,1), size_hint_y=None, height=40))
 
-            confirm_btn = Button(text=ar('تأكيد الطلب'), font_name='Cairo', font_size=24, bold=True, size_hint_y=None, height=80, background_color=(0.0, 0.6, 0.3, 1))
+            confirm_btn = Button(text=ar('تأكيد الطلب'), font_name='NotoArabic', font_size=24, bold=True, size_hint_y=None, height=80, background_color=(0.0, 0.6, 0.3, 1))
 
             def confirm_order(x):
                 global orders
@@ -478,7 +602,7 @@ class SupplierOrdersScreen(BaseScreen):
         self.add_back_button('home_screen')
 
         layout = BoxLayout(orientation='vertical', padding=20, spacing=10)
-        layout.add_widget(Label(text=ar('الطلبات الواردة'), font_name='Cairo', font_size=28, bold=True, size_hint_y=None, height=60))
+        layout.add_widget(Label(text=ar('الطلبات الواردة'), font_name='NotoArabic', font_size=28, bold=True, size_hint_y=None, height=60))
 
         scroll = ScrollView()
         grid = GridLayout(cols=1, size_hint_y=None, spacing=10, padding=10)
@@ -486,19 +610,19 @@ class SupplierOrdersScreen(BaseScreen):
 
         my_orders = [o for o in orders if o['supplier'] == current_email and o['status'] == 'قيد الانتظار']
         if not my_orders:
-            grid.add_widget(Label(text=ar('لا توجد طلبات'), font_name='Cairo', font_size=20))
+            grid.add_widget(Label(text=ar('لا توجد طلبات'), font_name='NotoArabic', font_size=20))
         else:
             for o in my_orders:
                 box = BoxLayout(orientation='vertical', size_hint_y=None, height=120, spacing=5)
                 box.add_widget(Label(
                     text=ar(f"طلب رقم #{o['id']}\n{o['product']} - {o['price']} نقطة\nالزبون: {o['customer']}\nالدفع: {o['payment_method']}"),
-                    font_name='Cairo',
+                    font_name='NotoArabic',
                     font_size=18
                 ))
 
                 validate_btn = Button(
                     text=ar('تأكيد'),
-                    font_name='Cairo',
+                    font_name='NotoArabic',
                     size_hint_y=None,
                     height=50,
                     background_color=(0.0, 0.6, 0.3, 1)
@@ -541,7 +665,7 @@ class DriverOrdersScreen(BaseScreen):
         self.add_back_button('home_screen')
 
         layout = BoxLayout(orientation='vertical', padding=20, spacing=10)
-        layout.add_widget(Label(text=ar('الطلبات الجاهزة'), font_name='Cairo', font_size=28, bold=True, size_hint_y=None, height=60))
+        layout.add_widget(Label(text=ar('الطلبات الجاهزة'), font_name='NotoArabic', font_size=28, bold=True, size_hint_y=None, height=60))
 
         scroll = ScrollView()
         grid = GridLayout(cols=1, size_hint_y=None)
@@ -549,12 +673,12 @@ class DriverOrdersScreen(BaseScreen):
 
         available = [o for o in orders if o['status'] == 'جاهز للتوصيل' and o['driver'] is None]
         if not available:
-            grid.add_widget(Label(text=ar('لا توجد طلبات'), font_name='Cairo', font_size=20))
+            grid.add_widget(Label(text=ar('لا توجد طلبات'), font_name='NotoArabic', font_size=20))
         else:
             for o in available:
                 btn = Button(
                     text=ar(f"طلب #{o['id']}\n{o['product']} - {o['price']} نقطة\nالتاجر: {o['supplier']}"),
-                    font_name='Cairo',
+                    font_name='NotoArabic',
                     font_size=18,
                     size_hint_y=None,
                     height=90,
@@ -586,7 +710,7 @@ class SettingsScreen(BaseScreen):
         balance = current_user['balance'] if current_user else 0
         self.balance_label = Label(
             text=ar(f'الرصيد: {balance} نقطة'),
-            font_name='Cairo',
+            font_name='NotoArabic',
             font_size=26, bold=True,
             size_hint=(0.85, 0.15),
             pos_hint={'center_x': 0.5, 'center_y': 0.7}
@@ -596,7 +720,7 @@ class SettingsScreen(BaseScreen):
         if current_user and current_user['type'] == 'زبون':
             topup_btn = Button(
                 text=ar('شحن الرصيد'),
-                font_name='Cairo',
+                font_name='NotoArabic',
                 font_size=24, bold=True,
                 size_hint=(0.85, 0.15),
                 pos_hint={'center_x': 0.5, 'center_y': 0.5},
@@ -610,7 +734,7 @@ class SettingsScreen(BaseScreen):
 
         logout_btn = Button(
             text=ar('تسجيل الخروج'),
-            font_name='Cairo',
+            font_name='NotoArabic',
             font_size=24, bold=True,
             size_hint=(0.85, 0.15),
             pos_hint={'center_x': 0.5, 'center_y': logout_y},
@@ -634,13 +758,13 @@ class TopUpScreen(BaseScreen):
         layout = BoxLayout(orientation='vertical', size_hint_y=None, padding=35, spacing=25)
         layout.bind(minimum_height=layout.setter('height'))
 
-        layout.add_widget(Label(text=ar('شحن الرصيد'), font_name='Cairo', size_hint_y=None, height=80, font_size=30, bold=True))
-        layout.add_widget(Label(text=ar('CCP: 1234 5678 99 00'), font_name='Cairo', font_size=22, size_hint_y=None, height=60))
-        layout.add_widget(Label(text=ar('1 نقطة = 10 دج'), font_name='Cairo', font_size=22, size_hint_y=None, height=60))
+        layout.add_widget(Label(text=ar('شحن الرصيد'), font_name='NotoArabic', size_hint_y=None, height=80, font_size=30, bold=True))
+        layout.add_widget(Label(text=ar('CCP: 1234 5678 99 00'), font_name='NotoArabic', font_size=22, size_hint_y=None, height=60))
+        layout.add_widget(Label(text=ar('1 نقطة = 10 دج'), font_name='NotoArabic', font_size=22, size_hint_y=None, height=60))
 
         self.amount = TextInput(
             hint_text=ar('المبلغ بالدينار'),
-            font_name='Cairo',
+            font_name='NotoArabic',
             multiline=False, input_filter='int',
             font_size=24, padding=[20, 25],
             background_color=(1, 1, 1, 1),
@@ -650,7 +774,7 @@ class TopUpScreen(BaseScreen):
 
         btn = Button(
             text=ar('طلب الشحن'),
-            font_name='Cairo',
+            font_name='NotoArabic',
             font_size=24, bold=True,
             size_hint_y=None, height=90,
             background_normal='', background_color=(0.0, 0.6, 0.4, 1)
@@ -679,6 +803,7 @@ class MainApp(App):
         self.title = ar('نشريلك')
         sm = ScreenManager()
         sm.add_widget(LoginScreen(name='login_screen'))
+        sm.add_widget(RegisterScreen(name='register_screen'))
         sm.add_widget(HomeScreen(name='home_screen'))
         sm.add_widget(ProductsScreen(name='products_screen'))
         sm.add_widget(AddProductScreen(name='add_product_screen'))
