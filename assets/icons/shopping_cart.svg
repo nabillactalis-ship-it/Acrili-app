@@ -1,0 +1,24 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background for app icon context (transparent in actual PNG) -->
+  <rect width="512" height="512" rx="100" fill="transparent"/>
+
+  <!-- Modern Minimalist Shopping Cart -->
+  <!-- Cart Body (Orange) -->
+  <path d="M110 120H150L190 350H390L430 180H175" stroke="#FF7A00" stroke-width="32" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- Handle Accent (Red) -->
+  <path d="M110 120L90 120" stroke="#E63946" stroke-width="32" stroke-linecap="round"/>
+
+  <!-- Bottom Edge Accent (Green) -->
+  <path d="M190 350H390" stroke="#2A9D8F" stroke-width="32" stroke-linecap="round"/>
+
+  <!-- Wheels (Orange with Red center) -->
+  <circle cx="210" cy="420" r="30" stroke="#FF7A00" stroke-width="12"/>
+  <circle cx="210" cy="420" r="10" fill="#E63946"/>
+
+  <circle cx="370" cy="420" r="30" stroke="#FF7A00" stroke-width="12"/>
+  <circle cx="370" cy="420" r="10" fill="#E63946"/>
+
+  <!-- Top Right Accent (Green) -->
+  <path d="M430 180L440 180" stroke="#2A9D8F" stroke-width="32" stroke-linecap="round"/>
+</svg>
