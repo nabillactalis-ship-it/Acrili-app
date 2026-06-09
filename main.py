@@ -320,9 +320,9 @@ class AddProductScreen(BaseScreen):
         self.pay_ccp = Button(text=ar('[ ] CCP'), font_name='Cairo', font_size=20, size_hint_y=None, height=70, background_color=(0.3,0.3,0.3,1))
         self.pay_cash = Button(text=ar('[ ] كاش'), font_name='Cairo', font_size=20, size_hint_y=None, height=70, background_color=(0.3,0.3,0.3,1))
 
-        self.pay_points.bind(on_press=lambda x: self.toggle_btn(self.pay_points))
-        self.pay_ccp.bind(on_press=lambda x: self.toggle_btn(self.pay_ccp))
-        self.pay_cash.bind(on_press=lambda x: self.toggle_btn(self.pay_cash))
+        self.pay_points.bind(on_press=lambda x: self.toggle_btn(self.pay_points, 'نقاط'))
+        self.pay_ccp.bind(on_press=lambda x: self.toggle_btn(self.pay_ccp, 'CCP'))
+        self.pay_cash.bind(on_press=lambda x: self.toggle_btn(self.pay_cash, 'كاش'))
 
         layout.add_widget(self.pay_points)
         layout.add_widget(self.pay_ccp)
@@ -340,15 +340,14 @@ class AddProductScreen(BaseScreen):
         layout_float.add_widget(scroll)
         self.add_widget(layout_float)
 
-    def toggle_btn(self, btn):
-        if '[ ]' in get_display(arabic_reshaper.reshape(btn.text)): # Check logically if possible, but let's be simpler
-            pass
-        # Better toggle check
-        if 'x' in btn.text:
-             btn.text = btn.text.replace('x', ' ')
+    def toggle_btn(self, btn, label):
+        if getattr(btn, 'active', False):
+             btn.active = False
+             btn.text = ar(f'[ ] {label}')
              btn.background_color = (0.3, 0.3, 0.3, 1)
         else:
-             btn.text = btn.text.replace(' ', 'x')
+             btn.active = True
+             btn.text = ar(f'[x] {label}')
              btn.background_color = (0.0, 0.6, 0.4, 1)
 
     def add_product(self, x):
@@ -356,9 +355,9 @@ class AddProductScreen(BaseScreen):
         try:
             price = int(self.price_input.text)
             methods = []
-            if 'x' in self.pay_points.text: methods.append('points')
-            if 'x' in self.pay_ccp.text: methods.append('ccp')
-            if 'x' in self.pay_cash.text: methods.append('cash')
+            if getattr(self.pay_points, 'active', False): methods.append('points')
+            if getattr(self.pay_ccp, 'active', False): methods.append('ccp')
+            if getattr(self.pay_cash, 'active', False): methods.append('cash')
 
             if name and price > 0 and methods and current_email:
                 products.append({

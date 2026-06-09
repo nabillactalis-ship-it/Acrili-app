@@ -21,6 +21,8 @@ jobs:
         # We also need to accept the licenses, which buildozer usually handles
         # but sometimes needs a little help in CI.
         yes | buildozer -v android debug
+    - name: List files
+      run: ls -R bin/
     - uses: actions/upload-artifact@v4
       with:
         name: package
