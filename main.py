@@ -5,6 +5,7 @@ from datetime import datetime
 
 import arabic_reshaper
 from bidi.algorithm import get_display
+import pyrebase
 
 from kivy.app import App
 from kivy.lang import Builder
@@ -21,6 +22,25 @@ from kivy.core.text import LabelBase
 from kivy.utils import get_color_from_hex
 from kivy.graphics import Color, RoundedRectangle
 
+# Firebase Config (Placeholders)
+firebase_config = {
+    "apiKey": "YOUR_API_KEY",
+    "authDomain": "YOUR_AUTH_DOMAIN",
+    "databaseURL": "YOUR_DATABASE_URL",
+    "projectId": "YOUR_PROJECT_ID",
+    "storageBucket": "YOUR_STORAGE_BUCKET",
+    "messagingSenderId": "YOUR_MESSAGING_SENDER_ID",
+    "appId": "YOUR_APP_ID"
+}
+
+# Initialize Firebase
+try:
+    firebase = pyrebase.initialize_app(firebase_config)
+    db = firebase.database()
+except Exception as e:
+    print(f"Firebase initialization failed: {e}")
+    db = None
+
 # تسجيل خط عربي
 font_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'Cairo-Regular.ttf')
 LabelBase.register(name='Cairo', fn_regular=font_path)
@@ -34,8 +54,6 @@ def ar(text):
         bidi_text = get_display(reshaped)
         # إزالة رموز التحكم Bidi التي قد تسبب مربعات في Kivy
         bidi_text = re.sub(r'[\u200e\u200f\u202a-\u202e]', '', bidi_text)
-        # توحيد المسافات لتجنب مشاكل العرض
-        bidi_text = bidi_text.replace('\u00a0', ' ')
         return bidi_text
     except Exception:
         return str(text)
@@ -49,26 +67,6 @@ COLORS = {
     'text': get_color_from_hex('#ffffff'),
     'text_dim': get_color_from_hex('#a0a0a0')
 }
-
-# ملفات التخزين
-DATA_DIR = os.path.join(os.getcwd(), 'nachrilak_data')
-os.makedirs(DATA_DIR, exist_ok=True)
-USERS_FILE = os.path.join(DATA_DIR, 'users.json')
-PRODUCTS_FILE = os.path.join(DATA_DIR, 'products.json')
-ORDERS_FILE = os.path.join(DATA_DIR, 'orders.json')
-
-def load_json(file):
-    if os.path.exists(file):
-        with open(file, 'r', encoding='utf-8') as f:
-            try:
-                return json.load(f)
-            except Exception:
-                return []
-    return []
-
-def save_json(file, data):
-    with open(file, 'w', encoding='utf-8') as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
 
 # متغيرات عامة
 current_user = None
@@ -229,7 +227,6 @@ ScreenManager:
             password: True
             font_name: 'Cairo'
             hint_text_font_name: 'Cairo'
-            font_size: 18
             multiline: False
             size_hint_y: None
             height: 50
@@ -668,38 +665,48 @@ class LoginScreen(BaseScreen):
         email = self.ids.email.text.strip()
         password = self.ids.password.text.strip()
 
-        users = load_json(USERS_FILE)
-        user = next((u for u in users if u['email'] == email and u['password'] == password), None)
+        if not db:
+            self.show_popup('خطأ', 'لا يوجد اتصال بالإنترنت')
+            return
 
-        if user:
-            current_user = user
-            self.manager.get_screen('home').ids.welcome.text = ar(f'مرحبا {user["name"]}')
+        try:
+            # Simple simulation of users collection since we don't have Auth here
+            # Email is used as safe key by replacing '.'
+            user_key = email.replace('.', ',')
+            user_data = db.child("users").child(user_key).get().val()
 
-            # Update profile info
-            profile = self.manager.get_screen('profile')
-            profile.ids.user_name.text = ar(f"الاسم: {user['name']}")
-            profile.ids.user_email.text = f"البريد: {user['email']}"
+            if user_data and user_data['password'] == password:
+                current_user = user_data
+                current_user['email'] = email
+                self.manager.get_screen('home').ids.welcome.text = ar(f'مرحبا {user_data["name"]}')
 
-            types_map = {'customer': 'زبون', 'supplier': 'تاجر', 'driver': 'سائق'}
-            display_type = types_map.get(user['type'], user['type'])
-            profile.ids.user_type.text = ar(f"نوع الحساب: {display_type}")
-            profile.ids.user_phone.text = ar(f"رقم الهاتف: {user['phone']}")
-            profile.ids.user_balance.text = ar(f"الرصيد: {user['balance']} دج")
+                # Update profile info
+                profile = self.manager.get_screen('profile')
+                profile.ids.user_name.text = ar(f"الاسم: {user_data['name']}")
+                profile.ids.user_email.text = f"البريد: {email}"
 
-            # Update add button visibility
-            add_btn = self.manager.get_screen('home').ids.add_btn
-            if user['type'] in ['supplier', 'admin']:
-                add_btn.opacity = 1
-                add_btn.disabled = False
+                types_map = {'customer': 'زبون', 'supplier': 'تاجر', 'driver': 'سائق'}
+                display_type = types_map.get(user_data['type'], user_data['type'])
+                profile.ids.user_type.text = ar(f"نوع الحساب: {display_type}")
+                profile.ids.user_phone.text = ar(f"رقم الهاتف: {user_data['phone']}")
+                profile.ids.user_balance.text = ar(f"الرصيد: {user_data['balance']} دج")
+
+                # Update add button visibility
+                add_btn = self.manager.get_screen('home').ids.add_btn
+                if user_data['type'] in ['supplier', 'admin']:
+                    add_btn.opacity = 1
+                    add_btn.disabled = False
+                else:
+                    add_btn.opacity = 0
+                    add_btn.disabled = True
+
+                self.manager.current = 'home'
+                self.ids.email.text = ''
+                self.ids.password.text = ''
             else:
-                add_btn.opacity = 0
-                add_btn.disabled = True
-
-            self.manager.current = 'home'
-            self.ids.email.text = ''
-            self.ids.password.text = ''
-        else:
-            self.show_popup('خطأ', 'البريد أو كلمة السر غير صحيحة')
+                self.show_popup('خطأ', 'البريد أو كلمة السر غير صحيحة')
+        except Exception as e:
+            self.show_popup('خطأ', f'فشل الاتصال: {str(e)}')
 
 class RegisterScreen(BaseScreen):
     def register(self):
@@ -709,11 +716,14 @@ class RegisterScreen(BaseScreen):
         phone = self.ids.phone.text.strip()
         user_type_display = self.ids.user_type.text
 
+        if not db:
+            self.show_popup('خطأ', 'لا يوجد اتصال بالإنترنت')
+            return
+
         if not all([name, email, password, phone]) or user_type_display == ar('اختر نوع الحساب'):
             self.show_popup('خطأ', 'املأ جميع الحقول')
             return
 
-        # Map display types to logical types
         types_map = {'زبون': 'customer', 'تاجر': 'supplier', 'سائق': 'driver'}
         logical_type = 'customer'
         for k, v in types_map.items():
@@ -721,23 +731,23 @@ class RegisterScreen(BaseScreen):
                 logical_type = v
                 break
 
-        users = load_json(USERS_FILE)
-        if any(u['email'] == email for u in users):
-            self.show_popup('خطأ', 'البريد موجود مسبقا')
-            return
+        try:
+            user_key = email.replace('.', ',')
+            if db.child("users").child(user_key).get().val():
+                self.show_popup('خطأ', 'البريد موجود مسبقا')
+                return
 
-        users.append({
-            'id': len(users) + 1,
-            'name': name,
-            'email': email,
-            'password': password,
-            'phone': phone,
-            'type': logical_type,
-            'balance': 0
-        })
-        save_json(USERS_FILE, users)
-        self.show_popup('نجاح', 'تم إنشاء الحساب بنجاح')
-        self.manager.current = 'login'
+            db.child("users").child(user_key).set({
+                'name': name,
+                'password': password,
+                'phone': phone,
+                'type': logical_type,
+                'balance': 0
+            })
+            self.show_popup('نجاح', 'تم إنشاء الحساب بنجاح')
+            self.manager.current = 'login'
+        except Exception as e:
+            self.show_popup('خطأ', f'فشل التسجيل: {str(e)}')
 
 class HomeScreen(BaseScreen):
     def logout(self):
@@ -753,32 +763,41 @@ class ProductsScreen(BaseScreen):
     def load_products(self):
         grid = self.ids.products_grid
         grid.clear_widgets()
-        products = load_json(PRODUCTS_FILE)
 
-        if not products:
-            grid.add_widget(Label(text=ar('لا توجد منتجات'), font_name='Cairo', size_hint_y=None, height=50))
+        if not db:
+            grid.add_widget(Label(text=ar('لا يوجد اتصال'), font_name='Cairo'))
             return
 
-        for p in products:
-            box = BoxLayout(orientation='vertical', size_hint_y=None, height=120, padding=10)
+        try:
+            products_data = db.child("products").get().val()
+            if not products_data:
+                grid.add_widget(Label(text=ar('لا توجد منتجات'), font_name='Cairo', size_hint_y=None, height=50))
+                return
 
-            with box.canvas.before:
-                Color(rgba=COLORS['card'])
-                rect = RoundedRectangle(pos=box.pos, size=box.size, radius=[15])
+            # Firebase returns a dict or list depending on structure
+            products_list = products_data.values() if isinstance(products_data, dict) else products_data
 
-            box.bind(pos=lambda inst, pos, r=rect: setattr(r, 'pos', pos))
-            box.bind(size=lambda inst, size, r=rect: setattr(r, 'size', size))
+            for p in products_list:
+                if not p: continue
+                box = BoxLayout(orientation='vertical', size_hint_y=None, height=120, padding=10)
+                with box.canvas.before:
+                    Color(rgba=COLORS['card'])
+                    rect = RoundedRectangle(pos=box.pos, size=box.size, radius=[15])
+                box.bind(pos=lambda inst, pos, r=rect: setattr(r, 'pos', pos))
+                box.bind(size=lambda inst, size, r=rect: setattr(r, 'size', size))
 
-            box.add_widget(Label(text=ar(p['name']), font_name='Cairo', font_size=18, bold=True, size_hint_y=0.4))
-            box.add_widget(Label(text=ar(p.get('desc', '')), font_name='Cairo', font_size=14, color=(0.7,0.7,0.7,1), size_hint_y=0.3))
+                box.add_widget(Label(text=ar(p['name']), font_name='Cairo', font_size=18, bold=True, size_hint_y=0.4))
+                box.add_widget(Label(text=ar(p.get('desc', '')), font_name='Cairo', font_size=14, color=(0.7,0.7,0.7,1), size_hint_y=0.3))
 
-            btn_box = BoxLayout(size_hint_y=0.3, spacing=10)
-            btn_box.add_widget(Label(text=ar(f"{p['price']} دج"), font_name='Cairo', bold=True))
-            btn = Button(text=ar('إضافة للسلة'), font_name='Cairo', background_color=COLORS['accent'])
-            btn.bind(on_release=lambda x, prod=p: self.add_to_cart(prod))
-            btn_box.add_widget(btn)
-            box.add_widget(btn_box)
-            grid.add_widget(box)
+                btn_box = BoxLayout(size_hint_y=0.3, spacing=10)
+                btn_box.add_widget(Label(text=ar(f"{p['price']} دج"), font_name='Cairo', bold=True))
+                btn = Button(text=ar('إضافة للسلة'), font_name='Cairo', background_color=COLORS['accent'])
+                btn.bind(on_release=lambda x, prod=p: self.add_to_cart(prod))
+                btn_box.add_widget(btn)
+                box.add_widget(btn_box)
+                grid.add_widget(box)
+        except Exception as e:
+            grid.add_widget(Label(text=ar(f'خطأ في التحميل: {str(e)}'), font_name='Cairo'))
 
     def add_to_cart(self, product):
         cart.append(product)
@@ -786,6 +805,10 @@ class ProductsScreen(BaseScreen):
 
 class AddProductScreen(BaseScreen):
     def add_product(self):
+        if not db:
+            self.show_popup('خطأ', 'لا يوجد اتصال بالإنترنت')
+            return
+
         if not current_user or current_user['type'] not in ['supplier', 'admin']:
             self.show_popup('خطأ', 'ليس لديك صلاحية')
             return
@@ -798,19 +821,19 @@ class AddProductScreen(BaseScreen):
             self.show_popup('خطأ', 'املأ اسم وسعر المنتج')
             return
 
-        products = load_json(PRODUCTS_FILE)
-        products.append({
-            'id': len(products) + 1,
-            'name': name,
-            'price': int(price),
-            'desc': desc,
-            'supplier': current_user['email']
-        })
-        save_json(PRODUCTS_FILE, products)
-        self.show_popup('نجاح', 'تم إضافة المنتج')
-        self.ids.name.text = ''
-        self.ids.price.text = ''
-        self.ids.desc.text = ''
+        try:
+            db.child("products").push({
+                'name': name,
+                'price': int(price),
+                'desc': desc,
+                'supplier': current_user['email']
+            })
+            self.show_popup('نجاح', 'تم إضافة المنتج')
+            self.ids.name.text = ''
+            self.ids.price.text = ''
+            self.ids.desc.text = ''
+        except Exception as e:
+            self.show_popup('خطأ', f'فشل الإضافة: {str(e)}')
 
 class CartScreen(BaseScreen):
     def on_pre_enter(self):
@@ -840,24 +863,27 @@ class CartScreen(BaseScreen):
         self.load_cart()
 
     def confirm_order(self):
+        if not db:
+            self.show_popup('خطأ', 'لا يوجد اتصال بالإنترنت')
+            return
+
         if not cart:
             self.show_popup('خطأ', 'السلة فارغة')
             return
 
-        orders = load_json(ORDERS_FILE)
-        order = {
-            'id': len(orders) + 1,
-            'customer': current_user['email'],
-            'products': cart.copy(),
-            'total': sum(p['price'] for p in cart),
-            'status': 'قيد المعالجة',
-            'date': datetime.now().strftime('%Y-%m-%d %H:%M')
-        }
-        orders.append(order)
-        save_json(ORDERS_FILE, orders)
-        cart.clear()
-        self.show_popup('نجاح', 'تم تأكيد الطلب بنجاح')
-        self.manager.current = 'home'
+        try:
+            db.child("orders").push({
+                'customer': current_user['email'],
+                'products': cart.copy(),
+                'total': sum(p['price'] for p in cart),
+                'status': 'قيد المعالجة',
+                'date': datetime.now().strftime('%Y-%m-%d %H:%M')
+            })
+            cart.clear()
+            self.show_popup('نجاح', 'تم تأكيد الطلب بنجاح')
+            self.manager.current = 'home'
+        except Exception as e:
+            self.show_popup('خطأ', f'فشل تأكيد الطلب: {str(e)}')
 
 class OrdersScreen(BaseScreen):
     def on_pre_enter(self):
@@ -866,27 +892,38 @@ class OrdersScreen(BaseScreen):
     def load_orders(self):
         grid = self.ids.orders_grid
         grid.clear_widgets()
-        orders = load_json(ORDERS_FILE)
-        user_orders = [o for o in orders if o['customer'] == current_user['email']]
 
-        if not user_orders:
-            grid.add_widget(Label(text=ar('لا توجد طلبات'), font_name='Cairo', size_hint_y=None, height=50))
+        if not db:
+            grid.add_widget(Label(text=ar('لا يوجد اتصال'), font_name='Cairo'))
             return
 
-        for o in user_orders:
-            box = BoxLayout(orientation='vertical', size_hint_y=None, height=100, padding=10)
+        try:
+            all_orders = db.child("orders").get().val()
+            if not all_orders:
+                grid.add_widget(Label(text=ar('لا توجد طلبات'), font_name='Cairo', size_hint_y=None, height=50))
+                return
 
-            with box.canvas.before:
-                Color(rgba=COLORS['card'])
-                rect = RoundedRectangle(pos=box.pos, size=box.size, radius=[15])
+            orders_list = all_orders.values() if isinstance(all_orders, dict) else all_orders
+            user_orders = [o for o in orders_list if o and o['customer'] == current_user['email']]
 
-            box.bind(pos=lambda inst, pos, r=rect: setattr(r, 'pos', pos))
-            box.bind(size=lambda inst, size, r=rect: setattr(r, 'size', size))
+            if not user_orders:
+                grid.add_widget(Label(text=ar('لا توجد طلبات'), font_name='Cairo', size_hint_y=None, height=50))
+                return
 
-            box.add_widget(Label(text=ar(f"طلب رقم {o['id']} - {o['date']}"), font_name='Cairo', bold=True, size_hint_y=0.3))
-            box.add_widget(Label(text=ar(f"عدد المنتجات: {len(o['products'])}"), font_name='Cairo', size_hint_y=0.3))
-            box.add_widget(Label(text=ar(f"الإجمالي: {o['total']} دج - الحالة: {o['status']}"), font_name='Cairo', color=(0.2,0.8,0.4,1), size_hint_y=0.4))
-            grid.add_widget(box)
+            for idx, o in enumerate(user_orders):
+                box = BoxLayout(orientation='vertical', size_hint_y=None, height=100, padding=10)
+                with box.canvas.before:
+                    Color(rgba=COLORS['card'])
+                    rect = RoundedRectangle(pos=box.pos, size=box.size, radius=[15])
+                box.bind(pos=lambda inst, pos, r=rect: setattr(r, 'pos', pos))
+                box.bind(size=lambda inst, size, r=rect: setattr(r, 'size', size))
+
+                box.add_widget(Label(text=ar(f"طلب رقم {idx+1} - {o['date']}"), font_name='Cairo', bold=True, size_hint_y=0.3))
+                box.add_widget(Label(text=ar(f"عدد المنتجات: {len(o['products'])}"), font_name='Cairo', size_hint_y=0.3))
+                box.add_widget(Label(text=ar(f"الإجمالي: {o['total']} دج - الحالة: {o['status']}"), font_name='Cairo', color=(0.2,0.8,0.4,1), size_hint_y=0.4))
+                grid.add_widget(box)
+        except Exception as e:
+            grid.add_widget(Label(text=ar(f'خطأ: {str(e)}'), font_name='Cairo'))
 
 class ProfileScreen(BaseScreen):
     pass
