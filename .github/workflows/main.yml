@@ -4,15 +4,24 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v3
-    - uses: actions/setup-python@v4
+    - uses: actions/checkout@v4
+    - uses: actions/setup-python@v5
       with:
         python-version: '3.10'
+    - name: Install dependencies
+      run: |
+        sudo apt update
+        sudo apt install -y build-essential libffi-dev libssl-dev zlib1g-dev libncurses5-dev libncursesw5-dev libreadline-dev libsqlite3-dev libgdbm-dev libdb5.3-dev libbz2-dev expat liblzma-dev tk-dev openjdk-17-jdk-headless autoconf libtool pkg-config automake m4 gettext libltdl-dev
     - name: Install buildozer
-      run: pip install buildozer cython
+      run: pip install --user --upgrade buildozer cython
     - name: Build APK
-      run: buildozer -v android debug
-    - uses: actions/upload-artifact@v3
+      run: |
+        export PATH=$PATH:~/.local/bin
+        # Use a non-interactive mode for buildozer
+        # We also need to accept the licenses, which buildozer usually handles
+        # but sometimes needs a little help in CI.
+        yes | buildozer -v android debug
+    - uses: actions/upload-artifact@v4
       with:
         name: package
         path: bin/*.apk
