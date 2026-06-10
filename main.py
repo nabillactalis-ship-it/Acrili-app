@@ -68,27 +68,41 @@ def hash_password(password):
     """تشفير كلمة السر"""
     return hashlib.sha256(password.encode()).hexdigest()
 
-# تهيئة Firebase
-firebase_config_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'google-services.json')
-with open(firebase_config_file, 'r') as f:
-    google_services = json.load(f)
+# تهيئة Firebase (تأجيلها لتفادي التعطل عند الانطلاق)
+db = None
 
-project_info = google_services['project_info']
-client_info = google_services['client'][0]
-api_key = client_info['api_key'][0]['current_key']
+def get_db():
+    global db
+    if db is None:
+        try:
+            firebase_config_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'google-services.json')
+            if not os.path.exists(firebase_config_file):
+                print(f"Warning: {firebase_config_file} not found")
+                return None
 
-firebase_config = {
-    "apiKey": api_key,
-    "authDomain": f"{project_info['project_id']}.firebaseapp.com",
-    "databaseURL": f"https://{project_info['project_id']}-default-rtdb.firebaseio.com",
-    "projectId": project_info['project_id'],
-    "storageBucket": project_info['storage_bucket'],
-    "messagingSenderId": project_info['project_number'],
-    "appId": client_info['client_info']['mobilesdk_app_id'] if 'mobilesdk_app_id' in client_info['client_info'] else ""
-}
+            with open(firebase_config_file, 'r') as f:
+                google_services = json.load(f)
 
-firebase = pyrebase.initialize_app(firebase_config)
-db = firebase.database()
+            project_info = google_services['project_info']
+            client_info = google_services['client'][0]
+            api_key = client_info['api_key'][0]['current_key']
+
+            firebase_config = {
+                "apiKey": api_key,
+                "authDomain": f"{project_info['project_id']}.firebaseapp.com",
+                "databaseURL": f"https://{project_info['project_id']}-default-rtdb.firebaseio.com",
+                "projectId": project_info['project_id'],
+                "storageBucket": project_info['storage_bucket'],
+                "messagingSenderId": project_info['project_number'],
+                "appId": client_info.get('client_info', {}).get('mobilesdk_app_id', "")
+            }
+
+            firebase = pyrebase.initialize_app(firebase_config)
+            db = firebase.database()
+        except Exception as e:
+            print(f"Firebase Init Error: {e}")
+            return None
+    return db
 
 # متغيرات عامة
 current_user = None
@@ -691,9 +705,18 @@ class LoginScreen(BaseScreen):
             return
 
         # Fetch user from Firebase
+        database = get_db()
+        if not database:
+            self.show_popup('خطأ', 'لا يمكن الاتصال بقاعدة البيانات')
+            return
+
         safe_email = email.replace('.', ',')
-        user_data = db.child("users").child(safe_email).get()
-        user = user_data.val()
+        try:
+            user_data = database.child("users").child(safe_email).get()
+            user = user_data.val()
+        except Exception as e:
+            self.show_popup('خطأ', f'فشل الاتصال: {e}')
+            return
 
         if user and user['password'] == hash_password(password):
             current_user = user
@@ -746,23 +769,32 @@ class RegisterScreen(BaseScreen):
                 break
 
         # Check if user exists in Firebase
-        safe_email = email.replace('.', ',')
-        # Optimized existence check by only getting the password field
-        if db.child("users").child(safe_email).child("password").get().val():
-            self.show_popup('خطأ', 'البريد موجود مسبقا')
+        database = get_db()
+        if not database:
+            self.show_popup('خطأ', 'لا يمكن الاتصال بقاعدة البيانات')
             return
 
-        user_obj = {
-            'name': name,
-            'email': email,
-            'password': hash_password(password),
-            'phone': phone,
-            'type': logical_type,
-            'balance': 0,
-            'created_at': datetime.now().strftime('%Y-%m-%d %H:%M')
-        }
+        safe_email = email.replace('.', ',')
+        try:
+            # Optimized existence check by only getting the password field
+            if database.child("users").child(safe_email).child("password").get().val():
+                self.show_popup('خطأ', 'البريد موجود مسبقا')
+                return
 
-        db.child("users").child(safe_email).set(user_obj)
+            user_obj = {
+                'name': name,
+                'email': email,
+                'password': hash_password(password),
+                'phone': phone,
+                'type': logical_type,
+                'balance': 0,
+                'created_at': datetime.now().strftime('%Y-%m-%d %H:%M')
+            }
+
+            database.child("users").child(safe_email).set(user_obj)
+        except Exception as e:
+            self.show_popup('خطأ', f'فشل العملية: {e}')
+            return
         self.show_popup('نجاح', 'تم إنشاء الحساب بنجاح')
         self.manager.current = 'login'
 
@@ -781,14 +813,23 @@ class ProductsScreen(BaseScreen):
         grid = self.ids.products_grid
         grid.clear_widgets()
 
+        database = get_db()
+        if not database:
+            grid.add_widget(Label(text=ar('خطأ في قاعدة البيانات'), font_name='Cairo', size_hint_y=None, height=50))
+            return
+
         # Fetch products from Firebase
-        products_data = db.child("products").get()
-        products = []
-        if products_data.val():
-            if isinstance(products_data.val(), list):
-                products = [p for p in products_data.val() if p is not None]
-            else:
-                products = list(products_data.val().values())
+        try:
+            products_data = database.child("products").get()
+            products = []
+            if products_data.val():
+                if isinstance(products_data.val(), list):
+                    products = [p for p in products_data.val() if p is not None]
+                else:
+                    products = list(products_data.val().values())
+        except Exception as e:
+            grid.add_widget(Label(text=ar(f'فشل التحميل: {e}'), font_name='Cairo', size_hint_y=None, height=50))
+            return
 
         if not products:
             grid.add_widget(Label(text=ar('لا توجد منتجات'), font_name='Cairo', size_hint_y=None, height=50))
@@ -842,7 +883,16 @@ class AddProductScreen(BaseScreen):
             'created_at': datetime.now().strftime('%Y-%m-%d %H:%M')
         }
 
-        db.child("products").push(product_obj)
+        database = get_db()
+        if not database:
+            self.show_popup('خطأ', 'قاعدة البيانات غير متوفرة')
+            return
+
+        try:
+            database.child("products").push(product_obj)
+        except Exception as e:
+            self.show_popup('خطأ', f'فشل الحفظ: {e}')
+            return
         self.show_popup('نجاح', 'تم إضافة المنتج')
         self.ids.name.text = ''
         self.ids.price.text = ''
@@ -880,6 +930,11 @@ class CartScreen(BaseScreen):
             self.show_popup('خطأ', 'السلة فارغة')
             return
 
+        database = get_db()
+        if not database:
+            self.show_popup('خطأ', 'لا يوجد اتصال')
+            return
+
         order = {
             'customer': current_user['email'],
             'products': cart.copy(),
@@ -888,7 +943,11 @@ class CartScreen(BaseScreen):
             'date': datetime.now().strftime('%Y-%m-%d %H:%M')
         }
 
-        db.child("orders").push(order)
+        try:
+            database.child("orders").push(order)
+        except Exception as e:
+            self.show_popup('خطأ', f'فشل الطلب: {e}')
+            return
         cart.clear()
         self.show_popup('نجاح', 'تم تأكيد الطلب بنجاح')
         self.manager.current = 'home'
@@ -901,20 +960,29 @@ class OrdersScreen(BaseScreen):
         grid = self.ids.orders_grid
         grid.clear_widgets()
 
-        # Fetch orders from Firebase
-        all_orders_data = db.child("orders").get()
-        user_orders = []
-        if all_orders_data.val():
-            all_orders = []
-            if isinstance(all_orders_data.val(), list):
-                all_orders = [o for o in all_orders_data.val() if o is not None]
-            else:
-                # Use key as ID if it doesn't have one
-                for key, val in all_orders_data.val().items():
-                    val['firebase_key'] = key
-                    all_orders.append(val)
+        database = get_db()
+        if not database:
+            grid.add_widget(Label(text=ar('خطأ في الاتصال'), font_name='Cairo', size_hint_y=None, height=50))
+            return
 
-            user_orders = [o for o in all_orders if o.get('customer') == current_user['email']]
+        # Fetch orders from Firebase
+        try:
+            all_orders_data = database.child("orders").get()
+            user_orders = []
+            if all_orders_data.val():
+                all_orders = []
+                if isinstance(all_orders_data.val(), list):
+                    all_orders = [o for o in all_orders_data.val() if o is not None]
+                else:
+                    # Use key as ID if it doesn't have one
+                    for key, val in all_orders_data.val().items():
+                        val['firebase_key'] = key
+                        all_orders.append(val)
+
+                user_orders = [o for o in all_orders if o.get('customer') == current_user['email']]
+        except Exception as e:
+            grid.add_widget(Label(text=ar(f'فشل التحميل: {e}'), font_name='Cairo', size_hint_y=None, height=50))
+            return
 
         if not user_orders:
             grid.add_widget(Label(text=ar('لا توجد طلبات'), font_name='Cairo', size_hint_y=None, height=50))
@@ -945,4 +1013,10 @@ class NeshrblekApp(App):
         return Builder.load_string(KV)
 
 if __name__ == '__main__':
-    NeshrblekApp().run()
+    try:
+        NeshrblekApp().run()
+    except Exception as e:
+        import traceback
+        with open("crash_log.txt", "w") as f:
+            f.write(f"App crashed at {datetime.now()}\n")
+            f.write(traceback.format_exc())

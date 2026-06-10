@@ -1,11 +1,11 @@
 [app]
 title = Ashrili
-package.name = ashrili
-package.domain = org.ashrili
+package.name = neshrblek
+package.domain = com.nabil
 source.dir =.
 source.include_exts = py,png,jpg,kv,atlas,ttf,json
 version = 0.1
-requirements = python3,kivy,arabic-reshaper,python-bidi,pyrebase4,openssl,requests
+requirements = python3,kivy,arabic-reshaper,python-bidi,pyrebase4,openssl,requests,cryptography,pyasn1,pyasn1-modules,jwcrypto,gcloud
 orientation = portrait
 fullscreen = 0
 android.arch = arm64-v8a
