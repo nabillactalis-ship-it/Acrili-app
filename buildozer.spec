@@ -1,6 +1,6 @@
 [app]
 title = Nacrilk
-package.name = nacrilk
+package.name = neshrblek
 package.domain = com.nabil
 source.dir =.
 source.include_exts = py,png,jpg,kv,atlas,ttf,json
