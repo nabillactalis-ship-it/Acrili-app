@@ -24,16 +24,22 @@ from kivy.utils import get_color_from_hex
 from kivy.graphics import Color, RoundedRectangle
 from kivy.metrics import dp
 from kivy.clock import Clock
+from kivy.properties import ListProperty
+from kivy.factory import Factory
+
+# Classes for instantiation in Python
+class CustomButton(Button):
+    bg_color = ListProperty([0.1, 0.6, 0.9, 1])
+
+class CustomLabel(Label):
+    pass
 
 # Firebase Configuration (Replace with your actual config)
 firebase_config = {
-    "apiKey": "YOUR_API_KEY",
-    "authDomain": "YOUR_PROJECT.firebaseapp.com",
-    "databaseURL": "https://YOUR_PROJECT.firebaseio.com",
-    "projectId": "YOUR_PROJECT",
-    "storageBucket": "YOUR_PROJECT.appspot.com",
-    "messagingSenderId": "YOUR_SENDER_ID",
-    "appId": "YOUR_APP_ID"
+    "apiKey": "AIzaSyBse22hA0dBwsRFWAs1Wdc3c0-XbdXYe5E",
+    "authDomain": "nacrilk.firebaseapp.com",
+    "databaseURL": "https://nacrilk-default-rtdb.firebaseio.com",
+    "storageBucket": "nacrilk.firebasestorage.app"
 }
 
 # Initialize Firebase
@@ -90,7 +96,7 @@ KV = f'''
 <SpinnerOption@Button>:
     font_name: 'Cairo'
 
-<CustomButton@Button>:
+<CustomButton>:
     bg_color: (0.1, 0.6, 0.9, 1)
     font_name: 'Cairo'
     font_size: 18
@@ -105,7 +111,7 @@ KV = f'''
             size: self.size
             radius: [15]
 
-<CustomLabel@Label>:
+<CustomLabel>:
     font_name: 'Cairo'
     color: 1,1,1,1
 

@@ -5,7 +5,7 @@ package.domain = org.neshrblek
 source.dir = .
 source.include_exts = py,png,jpg,kv,atlas,ttf,json
 version = 0.3.1
-requirements = python3,kivy,arabic-reshaper,python-bidi,pyrebase4
+requirements = python3,kivy==2.3.1,arabic-reshaper,python-bidi,pyrebase4,requests==2.32.3,urllib3<2.0.0
 orientation = portrait
 fullscreen = 0
 android.arch = arm64-v8a
@@ -17,3 +17,4 @@ android.ndk_path = .buildozer/android/platform/android-ndk-r25b
 [buildozer]
 log_level = 2
 warn_on_root = 1
+android.accept_sdk_license = True
