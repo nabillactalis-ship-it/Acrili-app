@@ -13,6 +13,8 @@ from kivy.graphics import Color, RoundedRectangle
 from kivy.properties import ListProperty
 import json
 import os
+import hashlib
+import pyrebase
 from datetime import datetime
 import arabic_reshaper
 from bidi.algorithm import get_display
@@ -61,6 +63,32 @@ def load_json(file):
 def save_json(file, data):
     with open(file, 'w', encoding='utf-8') as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
+
+def hash_password(password):
+    """تشفير كلمة السر"""
+    return hashlib.sha256(password.encode()).hexdigest()
+
+# تهيئة Firebase
+firebase_config_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'google-services.json')
+with open(firebase_config_file, 'r') as f:
+    google_services = json.load(f)
+
+project_info = google_services['project_info']
+client_info = google_services['client'][0]
+api_key = client_info['api_key'][0]['current_key']
+
+firebase_config = {
+    "apiKey": api_key,
+    "authDomain": f"{project_info['project_id']}.firebaseapp.com",
+    "databaseURL": f"https://{project_info['project_id']}-default-rtdb.firebaseio.com",
+    "projectId": project_info['project_id'],
+    "storageBucket": project_info['storage_bucket'],
+    "messagingSenderId": project_info['project_number'],
+    "appId": client_info['client_info']['mobilesdk_app_id'] if 'mobilesdk_app_id' in client_info['client_info'] else ""
+}
+
+firebase = pyrebase.initialize_app(firebase_config)
+db = firebase.database()
 
 # متغيرات عامة
 current_user = None
@@ -658,10 +686,16 @@ class LoginScreen(BaseScreen):
         email = self.ids.email.text.strip()
         password = self.ids.password.text.strip()
 
-        users = load_json(USERS_FILE)
-        user = next((u for u in users if u['email'] == email and u['password'] == password), None)
+        if not email or not password:
+            self.show_popup('خطأ', 'الرجاء إدخال البريد وكلمة السر')
+            return
 
-        if user:
+        # Fetch user from Firebase
+        safe_email = email.replace('.', ',')
+        user_data = db.child("users").child(safe_email).get()
+        user = user_data.val()
+
+        if user and user['password'] == hash_password(password):
             current_user = user
             self.manager.get_screen('home').ids.welcome.text = ar(f'مرحبا {user["name"]}')
 
@@ -711,21 +745,24 @@ class RegisterScreen(BaseScreen):
                 logical_type = v
                 break
 
-        users = load_json(USERS_FILE)
-        if any(u['email'] == email for u in users):
+        # Check if user exists in Firebase
+        safe_email = email.replace('.', ',')
+        # Optimized existence check by only getting the password field
+        if db.child("users").child(safe_email).child("password").get().val():
             self.show_popup('خطأ', 'البريد موجود مسبقا')
             return
 
-        users.append({
-            'id': len(users) + 1,
+        user_obj = {
             'name': name,
             'email': email,
-            'password': password,
+            'password': hash_password(password),
             'phone': phone,
             'type': logical_type,
-            'balance': 0
-        })
-        save_json(USERS_FILE, users)
+            'balance': 0,
+            'created_at': datetime.now().strftime('%Y-%m-%d %H:%M')
+        }
+
+        db.child("users").child(safe_email).set(user_obj)
         self.show_popup('نجاح', 'تم إنشاء الحساب بنجاح')
         self.manager.current = 'login'
 
@@ -743,7 +780,15 @@ class ProductsScreen(BaseScreen):
     def load_products(self):
         grid = self.ids.products_grid
         grid.clear_widgets()
-        products = load_json(PRODUCTS_FILE)
+
+        # Fetch products from Firebase
+        products_data = db.child("products").get()
+        products = []
+        if products_data.val():
+            if isinstance(products_data.val(), list):
+                products = [p for p in products_data.val() if p is not None]
+            else:
+                products = list(products_data.val().values())
 
         if not products:
             grid.add_widget(Label(text=ar('لا توجد منتجات'), font_name='Cairo', size_hint_y=None, height=50))
@@ -789,15 +834,15 @@ class AddProductScreen(BaseScreen):
             self.show_popup('خطأ', 'املأ اسم وسعر المنتج')
             return
 
-        products = load_json(PRODUCTS_FILE)
-        products.append({
-            'id': len(products) + 1,
+        product_obj = {
             'name': name,
             'price': int(price),
             'desc': desc,
-            'supplier': current_user['email']
-        })
-        save_json(PRODUCTS_FILE, products)
+            'supplier': current_user['email'],
+            'created_at': datetime.now().strftime('%Y-%m-%d %H:%M')
+        }
+
+        db.child("products").push(product_obj)
         self.show_popup('نجاح', 'تم إضافة المنتج')
         self.ids.name.text = ''
         self.ids.price.text = ''
@@ -835,17 +880,15 @@ class CartScreen(BaseScreen):
             self.show_popup('خطأ', 'السلة فارغة')
             return
 
-        orders = load_json(ORDERS_FILE)
         order = {
-            'id': len(orders) + 1,
             'customer': current_user['email'],
             'products': cart.copy(),
             'total': sum(p['price'] for p in cart),
             'status': 'قيد المعالجة',
             'date': datetime.now().strftime('%Y-%m-%d %H:%M')
         }
-        orders.append(order)
-        save_json(ORDERS_FILE, orders)
+
+        db.child("orders").push(order)
         cart.clear()
         self.show_popup('نجاح', 'تم تأكيد الطلب بنجاح')
         self.manager.current = 'home'
@@ -857,14 +900,27 @@ class OrdersScreen(BaseScreen):
     def load_orders(self):
         grid = self.ids.orders_grid
         grid.clear_widgets()
-        orders = load_json(ORDERS_FILE)
-        user_orders = [o for o in orders if o['customer'] == current_user['email']]
+
+        # Fetch orders from Firebase
+        all_orders_data = db.child("orders").get()
+        user_orders = []
+        if all_orders_data.val():
+            all_orders = []
+            if isinstance(all_orders_data.val(), list):
+                all_orders = [o for o in all_orders_data.val() if o is not None]
+            else:
+                # Use key as ID if it doesn't have one
+                for key, val in all_orders_data.val().items():
+                    val['firebase_key'] = key
+                    all_orders.append(val)
+
+            user_orders = [o for o in all_orders if o.get('customer') == current_user['email']]
 
         if not user_orders:
             grid.add_widget(Label(text=ar('لا توجد طلبات'), font_name='Cairo', size_hint_y=None, height=50))
             return
 
-        for o in user_orders:
+        for i, o in enumerate(user_orders):
             box = BoxLayout(orientation='vertical', size_hint_y=None, height=100, padding=10)
 
             with box.canvas.before:
@@ -874,7 +930,8 @@ class OrdersScreen(BaseScreen):
             box.bind(pos=lambda inst, pos, r=rect: setattr(r, 'pos', pos),
                      size=lambda inst, size, r=rect: setattr(r, 'size', size))
 
-            box.add_widget(Label(text=ar(f"طلب رقم {o['id']} - {o['date']}"), font_name='Cairo', bold=True, size_hint_y=0.3))
+            order_id = o.get('id', i+1)
+            box.add_widget(Label(text=ar(f"طلب رقم {order_id} - {o['date']}"), font_name='Cairo', bold=True, size_hint_y=0.3))
             box.add_widget(Label(text=ar(f"عدد المنتجات: {len(o['products'])}"), font_name='Cairo', size_hint_y=0.3))
             box.add_widget(Label(text=ar(f"الإجمالي: {o['total']} دج - الحالة: {o['status']}"), font_name='Cairo', color=(0.2,0.8,0.4,1), size_hint_y=0.4))
             grid.add_widget(box)
