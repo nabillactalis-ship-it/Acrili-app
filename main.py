@@ -158,7 +158,7 @@ ScreenManager:
             size_hint_y: 0.3
 
         CustomLabel:
-            text: "{ar('مرحبا بك في نشربلك')}"
+            text: "{ar('مرحبا بك في نشريلك')}"
             font_size: 28
             bold: True
             size_hint_y: None
@@ -1007,14 +1007,14 @@ class OrdersScreen(BaseScreen):
 class ProfileScreen(BaseScreen):
     pass
 
-class NeshrblekApp(App):
+class NacrilkApp(App):
     def build(self):
-        self.title = ar('نشربلك')
+        self.title = ar('نشريلك')
         return Builder.load_string(KV)
 
 if __name__ == '__main__':
     try:
-        NeshrblekApp().run()
+        NacrilkApp().run()
     except Exception as e:
         import traceback
         with open("crash_log.txt", "w") as f:
