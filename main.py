@@ -13,26 +13,83 @@ from kivy.graphics import Color, RoundedRectangle
 from kivy.properties import ListProperty
 import json
 import os
-import hashlib
-import pyrebase
+import sys
 from datetime import datetime
-import arabic_reshaper
-from bidi.algorithm import get_display
 
-# تسجيل خط عربي
-font_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'Cairo-Regular.ttf')
-LabelBase.register(name='Cairo', fn_regular=font_path)
+# إعداد تسجيل الأعطال في مكان قابل للكتابة
+def get_log_path():
+    try:
+        from kivy.utils import platform
+        if platform == 'android':
+            from android.storage import app_storage_dir
+            return os.path.join(app_storage_dir(), "crash_log.txt")
+    except:
+        pass
+    return os.path.join(os.getcwd(), "crash_log.txt")
+
+LOG_FILE = get_log_path()
+
+def log_error(msg):
+    with open(LOG_FILE, "a", encoding="utf-8") as f:
+        f.write(f"[{datetime.now()}] {msg}\n")
+
+# استيراد Kivy بحذر
+try:
+    from kivy.app import App
+    from kivy.lang import Builder
+    from kivy.uix.screenmanager import ScreenManager, Screen
+    from kivy.uix.label import Label
+    from kivy.uix.button import Button
+    from kivy.uix.boxlayout import BoxLayout
+    from kivy.uix.textinput import TextInput
+    from kivy.uix.scrollview import ScrollView
+    from kivy.uix.gridlayout import GridLayout
+    from kivy.core.text import LabelBase
+    from kivy.utils import get_color_from_hex
+    from kivy.graphics import Color, RoundedRectangle
+    from kivy.properties import ListProperty
+except Exception as e:
+    log_error(f"Kivy Import Error: {e}")
+    raise
+
+# دوال مساعدة للاستيراد المتأخر (Lazy Loading) مع التخزين المؤقت
+_reshaper = None
+_bidi = None
+
+def get_ar_tools():
+    global _reshaper, _bidi
+    if _reshaper is None or _bidi is None:
+        try:
+            import arabic_reshaper
+            from bidi.algorithm import get_display
+            _reshaper = arabic_reshaper
+            _bidi = get_display
+        except Exception as e:
+            log_error(f"Arabic Tools Import Error: {e}")
+    return _reshaper, _bidi
 
 def ar(text):
     """دالة تعالج العربية باش تتلصق وتترتب من اليمين"""
     if not text:
         return ""
+    reshaper, bidi = get_ar_tools()
+    if not reshaper or not bidi:
+        return str(text)
     try:
-        # Reshape and apply Bidi algorithm
-        reshaped = arabic_reshaper.reshape(str(text))
-        return get_display(reshaped)
+        reshaped = reshaper.reshape(str(text))
+        return bidi(reshaped)
     except Exception:
         return str(text)
+
+# تسجيل خط عربي
+try:
+    font_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'Cairo-Regular.ttf')
+    if os.path.exists(font_path):
+        LabelBase.register(name='Cairo', fn_regular=font_path)
+    else:
+        log_error("Font file Cairo-Regular.ttf not found")
+except Exception as e:
+    log_error(f"Font Registration Error: {e}")
 
 # ألوان التطبيق
 COLORS = {
@@ -66,7 +123,12 @@ def save_json(file, data):
 
 def hash_password(password):
     """تشفير كلمة السر"""
-    return hashlib.sha256(password.encode()).hexdigest()
+    try:
+        import hashlib
+        return hashlib.sha256(password.encode()).hexdigest()
+    except Exception as e:
+        log_error(f"Hashing Error: {e}")
+        return password
 
 # تهيئة Firebase (تأجيلها لتفادي التعطل عند الانطلاق)
 db = None
@@ -75,9 +137,10 @@ def get_db():
     global db
     if db is None:
         try:
+            import pyrebase
             firebase_config_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'google-services.json')
             if not os.path.exists(firebase_config_file):
-                print(f"Warning: {firebase_config_file} not found")
+                log_error(f"Config file {firebase_config_file} not found")
                 return None
 
             with open(firebase_config_file, 'r') as f:
@@ -100,7 +163,7 @@ def get_db():
             firebase = pyrebase.initialize_app(firebase_config)
             db = firebase.database()
         except Exception as e:
-            print(f"Firebase Init Error: {e}")
+            log_error(f"Firebase Init Error: {e}")
             return None
     return db
 
@@ -1010,13 +1073,20 @@ class ProfileScreen(BaseScreen):
 class NacrilkApp(App):
     def build(self):
         self.title = ar('نشريلك')
-        return Builder.load_string(KV)
+        try:
+            return Builder.load_string(KV)
+        except Exception as e:
+            import traceback
+            error_details = traceback.format_exc()
+            log_error(f"KV Loading Error: {error_details}")
+            return Label(text=f"Error loading UI:\n{e}")
 
 if __name__ == '__main__':
     try:
         NacrilkApp().run()
     except Exception as e:
         import traceback
-        with open("crash_log.txt", "w") as f:
-            f.write(f"App crashed at {datetime.now()}\n")
-            f.write(traceback.format_exc())
+        error_details = traceback.format_exc()
+        log_error(f"Top-level Crash: {error_details}")
+        # Show error in console/logcat as well
+        print(error_details)
