@@ -1,4 +1,3 @@
-# sha256:3db2674abf8fb756adb91b6f360550284811c5fa6c23493819e10b7f120a52
 from kivy.app import App
 from kivy.lang import Builder
 from kivy.uix.screenmanager import ScreenManager, Screen
@@ -64,6 +63,14 @@ def load_json(file):
 def save_json(file, data):
     with open(file, 'w', encoding='utf-8') as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
+
+def get_log_path():
+    """الحصول على مسار آمن لكتابة سجلات الأخطاء"""
+    try:
+        from android.storage import app_storage_dir
+        return os.path.join(app_storage_dir(), 'crash_log.txt')
+    except Exception:
+        return os.path.join(os.path.dirname(os.path.abspath(__file__)), 'crash_log.txt')
 
 def hash_password(password):
     """تشفير كلمة السر"""
@@ -1018,6 +1025,10 @@ if __name__ == '__main__':
         NacrilkApp().run()
     except Exception as e:
         import traceback
-        with open("crash_log.txt", "w") as f:
-            f.write(f"App crashed at {datetime.now()}\n")
-            f.write(traceback.format_exc())
+        log_file = get_log_path()
+        try:
+            with open(log_file, "w") as f:
+                f.write(f"App crashed at {datetime.now()}\n")
+                f.write(traceback.format_exc())
+        except Exception:
+            pass
