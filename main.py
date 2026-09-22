@@ -1,4 +1,3 @@
-# sha256:3db2674abf8fb756adb91b6f360550284811c5fa6c23493819e10b7f120a52
 from kivy.app import App
 from kivy.lang import Builder
 from kivy.uix.screenmanager import ScreenManager, Screen
@@ -1018,6 +1017,9 @@ if __name__ == '__main__':
         NacrilkApp().run()
     except Exception as e:
         import traceback
-        with open("crash_log.txt", "w") as f:
-            f.write(f"App crashed at {datetime.now()}\n")
-            f.write(traceback.format_exc())
+        try:
+            with open(get_log_path(), "w") as f:
+                f.write(f"App crashed at {datetime.now()}\n")
+                f.write(traceback.format_exc())
+        except Exception:
+            pass
