@@ -1,0 +1,60 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    match /users/{userId} {
+      allow read: if isSignedIn();
+      allow create: if isOwner(userId);
+      allow update: if isOwner(userId);
+    }
+
+    match /orders/{orderId} {
+
+      // القراءة: الموزع يرى الطلب فقط بعد قبول الزبون للسعر (ACCEPTED)
+      allow read: if isSignedIn() && (
+        resource.data.customerId == request.auth.uid ||
+        resource.data.merchantId == request.auth.uid ||
+        resource.data.driverId == request.auth.uid ||
+        (resource.data.status == 'ACCEPTED' && resource.data.driverId == null)
+      );
+
+      // إنشاء طلب جديد
+      allow create: if isSignedIn()
+        && request.resource.data.customerId == request.auth.uid
+        && request.resource.data.status == 'NEW';
+
+      // مسار الـ 6 ضغطات للتحديث
+      allow update: if isSignedIn() && (
+
+        // 1. التاجر يدخل السعر
+        (resource.data.merchantId == request.auth.uid
+          && resource.data.status == 'NEW'
+          && request.resource.data.status == 'PREPARING_PRICED'
+          && request.resource.data.pricing.itemsPrice > 0) ||
+
+        // 2. الزبون يقبل السعر
+        (resource.data.customerId == request.auth.uid
+          && resource.data.status == 'PREPARING_PRICED'
+          && request.resource.data.status == 'ACCEPTED') ||
+
+        // 3. الموزع يوافق على التوزيع
+        (resource.data.status == 'ACCEPTED'
+          && request.resource.data.status == 'ASSIGNED'
+          && request.resource.data.driverId == request.auth.uid) ||
+
+        // 4. الموزع ينهي التوصيل
+        (resource.data.driverId == request.auth.uid
+          && resource.data.status == 'ASSIGNED'
+          && request.resource.data.status == 'DELIVERED')
+      );
+    }
+  }
+}
