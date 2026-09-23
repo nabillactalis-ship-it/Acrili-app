@@ -1,4 +1,3 @@
-# sha256:3db2674abf8fb756adb91b6f360550284811c5fa6c23493819e10b7f120a52
 from kivy.app import App
 from kivy.lang import Builder
 from kivy.uix.screenmanager import ScreenManager, Screen
@@ -16,6 +15,8 @@ import json
 import os
 import hashlib
 import pyrebase
+import webbrowser
+from urllib.parse import quote
 from datetime import datetime
 import arabic_reshaper
 from bidi.algorithm import get_display
@@ -35,14 +36,14 @@ def ar(text):
     except Exception:
         return str(text)
 
-# ألوان التطبيق
+# ألوان التطبيق - الثيم الليلي الملكي (الملكي #1E1E2E والذهب #D4AF37 والبرتقالي #FF9F43)
 COLORS = {
-    'bg': get_color_from_hex('#1a1a2e'),
-    'card': get_color_from_hex('#16213e'),
-    'primary': get_color_from_hex('#0f3460'),
-    'accent': get_color_from_hex('#e94560'),
-    'text': get_color_from_hex('#ffffff'),
-    'text_dim': get_color_from_hex('#a0a0a0')
+    'bg': get_color_from_hex('#1E1E2E'),
+    'card': get_color_from_hex('#2A2A3D'),
+    'primary': get_color_from_hex('#D4AF37'),
+    'accent': get_color_from_hex('#FF9F43'),
+    'text': get_color_from_hex('#FFFFFF'),
+    'text_dim': get_color_from_hex('#A0A0A0')
 }
 
 # ملفات التخزين
@@ -68,6 +69,16 @@ def save_json(file, data):
 def hash_password(password):
     """تشفير كلمة السر"""
     return hashlib.sha256(password.encode()).hexdigest()
+
+def open_google_maps(location):
+    """فتح رابط Google Maps مباشرة بموقع الزبون"""
+    if not location:
+        return
+    if location.startswith("http://") or location.startswith("https://"):
+        url = location
+    else:
+        url = f"https://www.google.com/maps/search/?api=1&query={quote(location)}"
+    webbrowser.open(url)
 
 # تهيئة Firebase (تأجيلها لتفادي التعطل عند الانطلاق)
 db = None
@@ -124,7 +135,7 @@ ScreenManager:
     font_name: 'Cairo'
 
 <CustomButton@Button>:
-    bg_color: (0.1, 0.6, 0.9, 1)
+    bg_color: (1.0, 0.623, 0.263, 1)
     font_name: 'Cairo'
     font_size: 18
     size_hint_y: None
@@ -150,7 +161,7 @@ ScreenManager:
         spacing: 20
         canvas.before:
             Color:
-                rgba: 0.1, 0.1, 0.18, 1
+                rgba: 0.118, 0.118, 0.18, 1
             Rectangle:
                 pos: self.pos
                 size: self.size
@@ -162,6 +173,7 @@ ScreenManager:
             text: "{ar('مرحبا بك في نشريلك')}"
             font_size: 28
             bold: True
+            color: 0.831, 0.686, 0.216, 1
             size_hint_y: None
             height: 50
             halign: 'center'
@@ -169,7 +181,7 @@ ScreenManager:
         CustomLabel:
             text: "{ar('سجل دخولك للمتابعة')}"
             font_size: 16
-            color: 0.6,0.6,0.6,1
+            color: 0.63, 0.63, 0.63, 1
             size_hint_y: None
             height: 30
             halign: 'center'
@@ -183,7 +195,7 @@ ScreenManager:
             multiline: False
             size_hint_y: None
             height: 50
-            background_color: 0.15,0.15,0.25,1
+            background_color: 0.16, 0.16, 0.24, 1
             foreground_color: 1,1,1,1
             padding: 15
 
@@ -197,18 +209,18 @@ ScreenManager:
             multiline: False
             size_hint_y: None
             height: 50
-            background_color: 0.15,0.15,0.25,1
+            background_color: 0.16, 0.16, 0.24, 1
             foreground_color: 1,1,1,1
             padding: 15
 
         CustomButton:
             text: "{ar('تسجيل الدخول')}"
-            bg_color: (0.1, 0.6, 0.9, 1)
+            bg_color: (1.0, 0.623, 0.263, 1)
             on_release: root.login()
 
         CustomButton:
             text: "{ar('ليس لديك حساب؟ سجل الآن')}"
-            bg_color: (0.2,0.2,0.3,1)
+            bg_color: (0.16, 0.16, 0.24, 1)
             on_release: root.manager.current = 'register'
 
         Widget:
@@ -222,7 +234,7 @@ ScreenManager:
         spacing: 15
         canvas.before:
             Color:
-                rgba: 0.1, 0.1, 0.18, 1
+                rgba: 0.118, 0.118, 0.18, 1
             Rectangle:
                 pos: self.pos
                 size: self.size
@@ -231,6 +243,7 @@ ScreenManager:
             text: "{ar('إنشاء حساب جديد')}"
             font_size: 26
             bold: True
+            color: 0.831, 0.686, 0.216, 1
             size_hint_y: None
             height: 50
 
@@ -242,7 +255,7 @@ ScreenManager:
             multiline: False
             size_hint_y: None
             height: 50
-            background_color: 0.15,0.15,0.25,1
+            background_color: 0.16, 0.16, 0.24, 1
             foreground_color: 1,1,1,1
             padding: 15
 
@@ -254,7 +267,7 @@ ScreenManager:
             multiline: False
             size_hint_y: None
             height: 50
-            background_color: 0.15,0.15,0.25,1
+            background_color: 0.16, 0.16, 0.24, 1
             foreground_color: 1,1,1,1
             padding: 15
 
@@ -267,7 +280,7 @@ ScreenManager:
             multiline: False
             size_hint_y: None
             height: 50
-            background_color: 0.15,0.15,0.25,1
+            background_color: 0.16, 0.16, 0.24, 1
             foreground_color: 1,1,1,1
             padding: 15
 
@@ -280,7 +293,7 @@ ScreenManager:
             input_type: 'number'
             size_hint_y: None
             height: 50
-            background_color: 0.15,0.15,0.25,1
+            background_color: 0.16, 0.16, 0.24, 1
             foreground_color: 1,1,1,1
             padding: 15
 
@@ -292,17 +305,17 @@ ScreenManager:
             option_cls: 'SpinnerOption'
             size_hint_y: None
             height: 50
-            background_color: 0.15,0.15,0.25,1
+            background_color: 0.16, 0.16, 0.24, 1
             color: 1,1,1,1
 
         CustomButton:
             text: "{ar('إنشاء الحساب')}"
-            bg_color: (0.1, 0.6, 0.9, 1)
+            bg_color: (1.0, 0.623, 0.263, 1)
             on_release: root.register()
 
         CustomButton:
             text: "{ar('رجوع لتسجيل الدخول')}"
-            bg_color: (0.2,0.2,0.3,1)
+            bg_color: (0.16, 0.16, 0.24, 1)
             on_release: root.manager.current = 'login'
 
 <HomeScreen>:
@@ -311,7 +324,7 @@ ScreenManager:
         orientation: 'vertical'
         canvas.before:
             Color:
-                rgba: 0.1, 0.1, 0.18, 1
+                rgba: 0.118, 0.118, 0.18, 1
             Rectangle:
                 pos: self.pos
                 size: self.size
@@ -322,7 +335,7 @@ ScreenManager:
             padding: 10
             canvas.before:
                 Color:
-                    rgba: 0.15,0.15,0.25,1
+                    rgba: 0.16, 0.16, 0.24, 1
                 Rectangle:
                     pos: self.pos
                     size: self.size
@@ -332,6 +345,7 @@ ScreenManager:
                 text: "{ar('مرحبا')}"
                 font_size: 20
                 bold: True
+                color: 0.831, 0.686, 0.216, 1
 
         ScrollView:
             GridLayout:
@@ -343,25 +357,25 @@ ScreenManager:
 
                 CustomButton:
                     text: "{ar('المنتجات')}"
-                    bg_color: (0.1, 0.5, 0.8, 1)
+                    bg_color: (1.0, 0.623, 0.263, 1)
                     height: 120
                     on_release: root.manager.current = 'products'
 
                 CustomButton:
                     text: "{ar('سلة المشتريات')}"
-                    bg_color: (0.9, 0.3, 0.4, 1)
+                    bg_color: (1.0, 0.623, 0.263, 1)
                     height: 120
                     on_release: root.manager.current = 'cart'
 
                 CustomButton:
                     text: "{ar('طلباتي')}"
-                    bg_color: (0.2, 0.7, 0.5, 1)
+                    bg_color: (1.0, 0.623, 0.263, 1)
                     height: 120
                     on_release: root.manager.current = 'orders'
 
                 CustomButton:
                     text: "{ar('الملف الشخصي')}"
-                    bg_color: (0.8, 0.5, 0.1, 1)
+                    bg_color: (0.831, 0.686, 0.216, 1)
                     height: 120
                     on_release: root.manager.current = 'profile'
 
@@ -373,13 +387,13 @@ ScreenManager:
 
             CustomButton:
                 text: "{ar('إضافة منتج')}"
-                bg_color: (0.8, 0.5, 0.1, 1)
+                bg_color: (0.831, 0.686, 0.216, 1)
                 id: add_btn
                 on_release: root.manager.current = 'add_product'
 
             CustomButton:
                 text: "{ar('تسجيل الخروج')}"
-                bg_color: (0.5,0.2,0.2,1)
+                bg_color: (0.5, 0.2, 0.2, 1)
                 on_release: root.logout()
 
 <ProductsScreen>:
@@ -388,7 +402,7 @@ ScreenManager:
         orientation: 'vertical'
         canvas.before:
             Color:
-                rgba: 0.1, 0.1, 0.18, 1
+                rgba: 0.118, 0.118, 0.18, 1
             Rectangle:
                 pos: self.pos
                 size: self.size
@@ -399,7 +413,7 @@ ScreenManager:
             padding: 10
             canvas.before:
                 Color:
-                    rgba: 0.15,0.15,0.25,1
+                    rgba: 0.16, 0.16, 0.24, 1
                 Rectangle:
                     pos: self.pos
                     size: self.size
@@ -407,13 +421,14 @@ ScreenManager:
             CustomButton:
                 text: "{ar('رجوع')}"
                 size_hint_x: 0.2
-                bg_color: (0.3,0.3,0.4,1)
+                bg_color: (0.24, 0.24, 0.32, 1)
                 on_release: root.manager.current = 'home'
 
             CustomLabel:
                 text: "{ar('المنتجات المتاحة')}"
                 font_size: 20
                 bold: True
+                color: 0.831, 0.686, 0.216, 1
 
         ScrollView:
             id: scroll
@@ -433,7 +448,7 @@ ScreenManager:
         spacing: 15
         canvas.before:
             Color:
-                rgba: 0.1, 0.1, 0.18, 1
+                rgba: 0.118, 0.118, 0.18, 1
             Rectangle:
                 pos: self.pos
                 size: self.size
@@ -443,7 +458,7 @@ ScreenManager:
             height: 60
             canvas.before:
                 Color:
-                    rgba: 0.15,0.15,0.25,1
+                    rgba: 0.16, 0.16, 0.24, 1
                 Rectangle:
                     pos: self.pos
                     size: self.size
@@ -451,13 +466,14 @@ ScreenManager:
             CustomButton:
                 text: "{ar('رجوع')}"
                 size_hint_x: 0.2
-                bg_color: (0.3,0.3,0.4,1)
+                bg_color: (0.24, 0.24, 0.32, 1)
                 on_release: root.manager.current = 'home'
 
             CustomLabel:
                 text: "{ar('إضافة منتج جديد')}"
                 font_size: 20
                 bold: True
+                color: 0.831, 0.686, 0.216, 1
 
         TextInput:
             id: name
@@ -467,7 +483,7 @@ ScreenManager:
             multiline: False
             size_hint_y: None
             height: 50
-            background_color: 0.15,0.15,0.25,1
+            background_color: 0.16, 0.16, 0.24, 1
             foreground_color: 1,1,1,1
             padding: 15
 
@@ -480,7 +496,7 @@ ScreenManager:
             multiline: False
             size_hint_y: None
             height: 50
-            background_color: 0.15,0.15,0.25,1
+            background_color: 0.16, 0.16, 0.24, 1
             foreground_color: 1,1,1,1
             padding: 15
 
@@ -491,13 +507,13 @@ ScreenManager:
             hint_text_font_name: 'Cairo'
             size_hint_y: None
             height: 100
-            background_color: 0.15,0.15,0.25,1
+            background_color: 0.16, 0.16, 0.24, 1
             foreground_color: 1,1,1,1
             padding: 15
 
         CustomButton:
             text: "{ar('حفظ المنتج')}"
-            bg_color: (0.1, 0.6, 0.9, 1)
+            bg_color: (1.0, 0.623, 0.263, 1)
             on_release: root.add_product()
 
 <CartScreen>:
@@ -506,7 +522,7 @@ ScreenManager:
         orientation: 'vertical'
         canvas.before:
             Color:
-                rgba: 0.1, 0.1, 0.18, 1
+                rgba: 0.118, 0.118, 0.18, 1
             Rectangle:
                 pos: self.pos
                 size: self.size
@@ -517,7 +533,7 @@ ScreenManager:
             padding: 10
             canvas.before:
                 Color:
-                    rgba: 0.15,0.15,0.25,1
+                    rgba: 0.16, 0.16, 0.24, 1
                 Rectangle:
                     pos: self.pos
                     size: self.size
@@ -525,13 +541,25 @@ ScreenManager:
             CustomButton:
                 text: "{ar('رجوع')}"
                 size_hint_x: 0.2
-                bg_color: (0.3,0.3,0.4,1)
+                bg_color: (0.24, 0.24, 0.32, 1)
                 on_release: root.manager.current = 'home'
 
             CustomLabel:
                 text: "{ar('سلة المشتريات')}"
                 font_size: 20
                 bold: True
+                color: 0.831, 0.686, 0.216, 1
+
+        TextInput:
+            id: customer_location
+            hint_text: "{ar('عنوان/موقع التوصيل أو رابط GPS')}"
+            font_name: 'Cairo'
+            hint_text_font_name: 'Cairo'
+            size_hint_y: None
+            height: 50
+            background_color: 0.16, 0.16, 0.24, 1
+            foreground_color: 1,1,1,1
+            padding: 15
 
         ScrollView:
             id: scroll
@@ -554,10 +582,11 @@ ScreenManager:
                 text: "{ar('الإجمالي: 0 دج')}"
                 font_size: 18
                 bold: True
+                color: 0.831, 0.686, 0.216, 1
 
             CustomButton:
                 text: "{ar('تأكيد الطلب')}"
-                bg_color: (0.1, 0.7, 0.4, 1)
+                bg_color: (1.0, 0.623, 0.263, 1)
                 on_release: root.confirm_order()
 
 <OrdersScreen>:
@@ -566,7 +595,7 @@ ScreenManager:
         orientation: 'vertical'
         canvas.before:
             Color:
-                rgba: 0.1, 0.1, 0.18, 1
+                rgba: 0.118, 0.118, 0.18, 1
             Rectangle:
                 pos: self.pos
                 size: self.size
@@ -577,7 +606,7 @@ ScreenManager:
             padding: 10
             canvas.before:
                 Color:
-                    rgba: 0.15,0.15,0.25,1
+                    rgba: 0.16, 0.16, 0.24, 1
                 Rectangle:
                     pos: self.pos
                     size: self.size
@@ -585,13 +614,14 @@ ScreenManager:
             CustomButton:
                 text: "{ar('رجوع')}"
                 size_hint_x: 0.2
-                bg_color: (0.3,0.3,0.4,1)
+                bg_color: (0.24, 0.24, 0.32, 1)
                 on_release: root.manager.current = 'home'
 
             CustomLabel:
                 text: "{ar('طلباتي')}"
                 font_size: 20
                 bold: True
+                color: 0.831, 0.686, 0.216, 1
 
         ScrollView:
             id: scroll
@@ -611,7 +641,7 @@ ScreenManager:
         spacing: 20
         canvas.before:
             Color:
-                rgba: 0.1, 0.1, 0.18, 1
+                rgba: 0.118, 0.118, 0.18, 1
             Rectangle:
                 pos: self.pos
                 size: self.size
@@ -622,7 +652,7 @@ ScreenManager:
             padding: 10
             canvas.before:
                 Color:
-                    rgba: 0.15,0.15,0.25,1
+                    rgba: 0.16, 0.16, 0.24, 1
                 Rectangle:
                     pos: self.pos
                     size: self.size
@@ -630,13 +660,14 @@ ScreenManager:
             CustomButton:
                 text: "{ar('رجوع')}"
                 size_hint_x: 0.2
-                bg_color: (0.3,0.3,0.4,1)
+                bg_color: (0.24, 0.24, 0.32, 1)
                 on_release: root.manager.current = 'home'
 
             CustomLabel:
                 text: "{ar('الملف الشخصي')}"
                 font_size: 24
                 bold: True
+                color: 0.831, 0.686, 0.216, 1
 
         ScrollView:
             BoxLayout:
@@ -682,7 +713,7 @@ ScreenManager:
                     id: user_balance
                     text: ""
                     font_size: 18
-                    color: 0.2, 0.8, 0.2, 1
+                    color: 0.831, 0.686, 0.216, 1
                     size_hint_y: None
                     height: 40
                     halign: 'right'
@@ -936,11 +967,14 @@ class CartScreen(BaseScreen):
             self.show_popup('خطأ', 'لا يوجد اتصال')
             return
 
+        loc = self.ids.customer_location.text.strip()
+
         order = {
             'customer': current_user['email'],
             'products': cart.copy(),
             'total': sum(p['price'] for p in cart),
-            'status': 'قيد المعالجة',
+            'status': 'NEW',
+            'location': loc if loc else 'الجزائر العاصمة',
             'date': datetime.now().strftime('%Y-%m-%d %H:%M')
         }
 
@@ -950,6 +984,7 @@ class CartScreen(BaseScreen):
             self.show_popup('خطأ', f'فشل الطلب: {e}')
             return
         cart.clear()
+        self.ids.customer_location.text = ''
         self.show_popup('نجاح', 'تم تأكيد الطلب بنجاح')
         self.manager.current = 'home'
 
@@ -969,18 +1004,25 @@ class OrdersScreen(BaseScreen):
         # Fetch orders from Firebase
         try:
             all_orders_data = database.child("orders").get()
-            user_orders = []
+            orders_list = []
             if all_orders_data.val():
-                all_orders = []
                 if isinstance(all_orders_data.val(), list):
-                    all_orders = [o for o in all_orders_data.val() if o is not None]
+                    for idx, o in enumerate(all_orders_data.val()):
+                        if o is not None:
+                            o['firebase_key'] = str(idx)
+                            orders_list.append(o)
                 else:
-                    # Use key as ID if it doesn't have one
                     for key, val in all_orders_data.val().items():
                         val['firebase_key'] = key
-                        all_orders.append(val)
+                        orders_list.append(val)
 
-                user_orders = [o for o in all_orders if o.get('customer') == current_user['email']]
+            # Filter or show according to user type
+            if current_user and current_user.get('type') == 'driver':
+                user_orders = orders_list
+            elif current_user:
+                user_orders = [o for o in orders_list if o.get('customer') == current_user['email']]
+            else:
+                user_orders = []
         except Exception as e:
             grid.add_widget(Label(text=ar(f'فشل التحميل: {e}'), font_name='Cairo', size_hint_y=None, height=50))
             return
@@ -990,7 +1032,7 @@ class OrdersScreen(BaseScreen):
             return
 
         for i, o in enumerate(user_orders):
-            box = BoxLayout(orientation='vertical', size_hint_y=None, height=100, padding=10)
+            box = BoxLayout(orientation='vertical', size_hint_y=None, height=140, padding=10)
 
             with box.canvas.before:
                 Color(rgba=COLORS['card'])
@@ -1000,9 +1042,18 @@ class OrdersScreen(BaseScreen):
                      size=lambda inst, size, r=rect: setattr(r, 'size', size))
 
             order_id = o.get('id', i+1)
-            box.add_widget(Label(text=ar(f"طلب رقم {order_id} - {o['date']}"), font_name='Cairo', bold=True, size_hint_y=0.3))
-            box.add_widget(Label(text=ar(f"عدد المنتجات: {len(o['products'])}"), font_name='Cairo', size_hint_y=0.3))
-            box.add_widget(Label(text=ar(f"الإجمالي: {o['total']} دج - الحالة: {o['status']}"), font_name='Cairo', color=(0.2,0.8,0.4,1), size_hint_y=0.4))
+            box.add_widget(Label(text=ar(f"طلب رقم {order_id} - {o.get('date', '')}"), font_name='Cairo', bold=True, size_hint_y=0.25))
+            box.add_widget(Label(text=ar(f"عدد المنتجات: {len(o.get('products', []))}"), font_name='Cairo', size_hint_y=0.25))
+            box.add_widget(Label(text=ar(f"الإجمالي: {o.get('total', 0)} دج - الحالة: {o.get('status', 'NEW')}"), font_name='Cairo', color=(0.2,0.8,0.4,1), size_hint_y=0.25))
+
+            # Driver action button: Google Maps directions
+            btn_box = BoxLayout(size_hint_y=0.25, spacing=10)
+            maps_btn = Button(text=ar('فتح Google Maps (موقع الزبون)'), font_name='Cairo', background_color=COLORS['accent'])
+            loc = o.get('location', 'الجزائر العاصمة')
+            maps_btn.bind(on_release=lambda x, location=loc: open_google_maps(location))
+            btn_box.add_widget(maps_btn)
+
+            box.add_widget(btn_box)
             grid.add_widget(box)
 
 class ProfileScreen(BaseScreen):
