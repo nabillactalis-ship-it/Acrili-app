@@ -78,7 +78,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
           padding: const EdgeInsets.all(24.0),
           child: SingleChildScrollView(
             child: Column(
-              crossAxisAlignment: CrossAlignment.stretch,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 TextField(
                   controller: _nameController,
