@@ -1,5 +1,41 @@
-__pycache__/
+# Miscellaneous
+*.class
+*.log
 *.pyc
-nachrilak_data/
+*.swp
+.DS_Store
+.atom/
 .buildozer/
+.build/
+.history
+.svn/
+*.apk
+*.aab
+
+# IntelliJ
+.idea/
+*.iml
+*.iws
+*.ipr
+
+# Visual Studio Code
+.vscode/
+
+# Flutter / Dart
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+.pub/
+build/
 bin/
+
+# Android
+android/app/debug
+android/app/profile
+android/app/release
+
+# Python legacy
+__pycache__/
+nachrilak_data/
