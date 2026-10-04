@@ -12,5 +12,9 @@
 -dontwarn com.google.firebase.**
 -dontwarn com.google.android.gms.**
 
+# Suppress Play Store deferred component warnings in Flutter core
+-dontwarn com.google.android.play.**
+-dontwarn io.flutter.embedding.engine.deferredcomponents.**
+
 # Keep generated plugin registrants
 -keep class io.flutter.plugins.** { *; }
