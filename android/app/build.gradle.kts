@@ -1,8 +1,8 @@
 plugins {
     id("com.android.application")
     id("kotlin-android")
-    // Google services Gradle plugin for Firebase
-    id("com.google.gms.google-services")
+    // Google services Gradle plugin for Firebase disabled to avoid Missing Google App Id failure when google-services.json is incomplete
+    // id("com.google.gms.google-services")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
 }
