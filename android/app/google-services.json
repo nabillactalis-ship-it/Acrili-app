@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "941746510745",
+    "project_id": "nacrilk",
+    "storage_bucket": "nacrilk.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:941746510745:android:a53a940d2febd4dff6d108",
+        "android_client_info": {
+          "package_name": "com.nabil.neshrblek"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBse22hAOdBWsRFWAs1Wdc3c0-XbdXYe5E"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
